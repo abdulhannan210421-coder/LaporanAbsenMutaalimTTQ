@@ -812,18 +812,41 @@
         return 'Jilid 1';
     }
 
+    // Pembantu penarikan data aman dengan sistem RETRY jika Google Apps Script memberikan HTML
+    async function fetchJsonSafe(url, retries = 3, delayMs = 1000) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                const res = await fetch(url, { redirect: 'follow' });
+                const text = await res.text();
+
+                if (text.trim().startsWith('<')) {
+                    throw new Error("Server Google Apps Script merespons HTML/sibuk.");
+                }
+
+                return JSON.parse(text);
+            } catch (err) {
+                if (i === retries - 1) throw err;
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+    }
+
+    // Penarikan data sekuensial (bergantian) agar server Google Apps Script tidak kolaps
     async function fetchDataOnline() {
         document.getElementById('loadingOverlay').classList.add('active');
         document.getElementById('btnSync').disabled = true;
 
         try {
-            const [resMaster, resTaklimda] = await Promise.all([
-                fetch(URL_MASTER).then(r => r.json()),
-                fetch(URL_TAKLIMDA + '?action=getAllInitData').then(r => r.json())
-            ]);
-
+            // 1. Ambil Data Master dahulu
+            const resMaster = await fetchJsonSafe(URL_MASTER);
             parseMasterData(resMaster);
-            
+
+            // 2. Beri jeda 500ms agar koneksi Google Apps Script stabil
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 3. Ambil Data Taklimda
+            const resTaklimda = await fetchJsonSafe(URL_TAKLIMDA + '?action=getAllInitData');
+
             if (Array.isArray(resTaklimda)) {
                 rawTaklimdaList = resTaklimda;
             } else if (resTaklimda && resTaklimda.rekap) {
@@ -947,6 +970,7 @@
         recalculateAndRenderAll();
     }
 
+    /* REVISI LOGIKA: Menghitung HEADCOUNT / JUMLAH SANTRI yang Sakit/Izin/Alpa, BUKAN total frekuensinya */
     function parseTaklimdaDataFiltered(filterBulan, filterTahun) {
         absenDataMtqMap.clear();
         absenDataMqsMap.clear();
@@ -961,9 +985,10 @@
             if (filterTahun !== 'ALL' && rowTahun.toLowerCase() !== filterTahun.toLowerCase()) return;
 
             let id = cleanId(row.idpps || row.id);
-            let s = parseInt(row.totalsakit) || 0;
-            let i = parseInt(row.totalizin) || 0;
-            let a = parseInt(row.totalalpa || row.totalalpha) || 0;
+            let valS = parseInt(row.totalsakit) || 0;
+            let valI = parseInt(row.totalizin) || 0;
+            let valA = parseInt(row.totalalpa || row.totalalpha) || 0;
+
             let kategori = String(row.kategori || '').toUpperCase();
             let dom = String(row.domisili || '').trim();
             let rawMarhalah = String(row.marhalahjilid || row.marhalah || row.jilid || '').trim();
@@ -972,19 +997,36 @@
 
             if (dbSantriMtqMap.has(id) || kategori.includes('MTQ')) {
                 if (!absenDataMtqMap.has(id)) {
-                    absenDataMtqMap.set(id, { id, s: 0, i: 0, a: 0, dom, marhalah: rawMarhalah });
+                    absenDataMtqMap.set(id, { id, dom, marhalah: rawMarhalah, rawS: 0, rawI: 0, rawA: 0 });
                 }
                 let rec = absenDataMtqMap.get(id);
-                rec.s += s; rec.i += i; rec.a += a;
+                rec.rawS += valS;
+                rec.rawI += valI;
+                rec.rawA += valA;
             }
 
             if (dbSantriMqsMap.has(id) || kategori.includes('MQS')) {
                 if (!absenDataMqsMap.has(id)) {
-                    absenDataMqsMap.set(id, { id, s: 0, i: 0, a: 0, dom, jilid: rawMarhalah });
+                    absenDataMqsMap.set(id, { id, dom, jilid: rawMarhalah, rawS: 0, rawI: 0, rawA: 0 });
                 }
                 let rec = absenDataMqsMap.get(id);
-                rec.s += s; rec.i += i; rec.a += a;
+                rec.rawS += valS;
+                rec.rawI += valI;
+                rec.rawA += valA;
             }
+        });
+
+        // Konversi totalsakit/totalizin/totalalpa ke headcount santri (1 jika > 0, 0 jika tidak ada)
+        absenDataMtqMap.forEach(rec => {
+            rec.s = rec.rawS > 0 ? 1 : 0;
+            rec.i = rec.rawI > 0 ? 1 : 0;
+            rec.a = rec.rawA > 0 ? 1 : 0;
+        });
+
+        absenDataMqsMap.forEach(rec => {
+            rec.s = rec.rawS > 0 ? 1 : 0;
+            rec.i = rec.rawI > 0 ? 1 : 0;
+            rec.a = rec.rawA > 0 ? 1 : 0;
         });
     }
 
