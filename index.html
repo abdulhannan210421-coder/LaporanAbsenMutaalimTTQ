@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekap Presisi Absensi Mutaallim Online (MTQ & MQS)</title>
+    <!-- ExcelJS CDN untuk Export -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #1b5e20;
+            --header-bg: #92d050;
+            --row-alt: #d9e1f2;
+            --border-color: #333;
+            --text-dark: #1f2937;
+            --ios-accent: #16a34a;
+            --ios-bg: #f2f2f7;
+            --ios-card: rgba(255, 255, 255, 0.85);
+            --ios-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+            --ios-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--ios-bg);
+            color: var(--text-dark);
+            padding: 20px 10px;
+            line-height: 1.5;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* --- Ambient Animated Background Orbs --- */
+        .ambient-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.45;
+            animation: floatOrb 18s infinite alternate ease-in-out;
+        }
+
+        .orb-1 {
+            width: 350px;
+            height: 350px;
+            background: #86efac;
+            top: -50px;
+            left: -50px;
+        }
+
+        .orb-2 {
+            width: 450px;
+            height: 450px;
+            background: #93c5fd;
+            bottom: -100px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 300px;
+            height: 300px;
+            background: #fde047;
+            top: 40%;
+            left: 60%;
+            animation-delay: -10s;
+        }
+
+        @keyframes floatOrb {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(60px, 80px) scale(1.15); }
+            100% { transform: translate(-40px, 50px) scale(0.9); }
+        }
+
+        /* --- Splash Screen Welcome --- */
+        #splashScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(25px);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+
+        #splashScreen.hide {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .splash-logo {
+            font-size: 56px;
+            margin-bottom: 15px;
+            animation: bounceLogo 1.2s var(--ios-spring) infinite alternate;
+        }
+
+        .splash-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #14532d;
+            text-align: center;
+            letter-spacing: -0.5px;
+            padding: 0 20px;
+        }
+
+        .splash-sub {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+        @keyframes bounceLogo {
+            0% { transform: translateY(0) scale(1); }
+            100% { transform: translateY(-15px) scale(1.1); }
+        }
+
+        /* --- iOS Dynamic Island Notification Banner --- */
+        .ios-toast-container {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9990;
+            width: calc(100% - 30px);
+            max-width: 480px;
+            pointer-events: none;
+        }
+
+        .ios-toast {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(20px);
+            color: #ffffff;
+            padding: 14px 20px;
+            border-radius: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.25);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            transform: translateY(-120px) scale(0.85);
+            opacity: 0;
+            transition: transform 0.5s var(--ios-spring), opacity 0.4s ease;
+            pointer-events: auto;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .ios-toast.show {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+
+        .ios-toast.error {
+            background: rgba(153, 27, 27, 0.92);
+        }
+
+        .toast-icon {
+            font-size: 18px;
+            background: rgba(255,255,255,0.2);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* --- Loading Overlay --- */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(15px);
+            z-index: 9980;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loader-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px 40px;
+            border-radius: 24px;
+            box-shadow: var(--ios-shadow);
+            border: 1px solid rgba(255,255,255,0.8);
+            text-align: center;
+            animation: popupBounce 0.5s var(--ios-spring);
+        }
+
+        .spinner-ios {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid var(--ios-accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 15px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* --- Main Container & Glassmorphism --- */
+        .container {
+            max-width: 1350px;
+            margin: 0 auto;
+            background: var(--ios-card);
+            backdrop-filter: blur(30px);
+            padding: 30px;
+            border-radius: 28px;
+            box-shadow: var(--ios-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            animation: pageFadeIn 0.8s ease-out;
+        }
+
+        @keyframes pageFadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        header {
+            border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+            padding-bottom: 20px;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            color: #14532d;
+            font-size: 26px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 14px;
+            margin-top: 6px;
+            font-weight: 500;
+        }
+
+        /* --- Action Bar & Config Panel --- */
+        .action-bar {
+            background: rgba(241, 245, 249, 0.7);
+            border: 1px solid rgba(203, 213, 225, 0.6);
+            padding: 16px 24px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .main-nav {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            background: #e2e8f0;
+            padding: 6px;
+            border-radius: 16px;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 14px 20px;
+            font-size: 15px;
+            font-weight: 700;
+            border: none;
+            background: transparent;
+            color: #64748b;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s var(--ios-spring);
+            text-align: center;
+        }
+
+        .nav-btn.active {
+            background: #ffffff;
+            color: #16a34a;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transform: scale(1.02);
+        }
+
+        .config-panel {
+            background: rgba(248, 250, 252, 0.8);
+            border: 1px solid rgba(203, 213, 225, 0.6);
+            padding: 20px 24px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            align-items: center;
+        }
+
+        .config-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .config-group label {
+            font-weight: 700;
+            font-size: 13px;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .config-group input[type="number"], 
+        .config-group input[type="text"], 
+        .config-group select {
+            padding: 12px 16px;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            background-color: #ffffff;
+            outline: none;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+
+        .config-group input:focus, .config-group select:focus {
+            border-color: #16a34a;
+            box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.15);
+        }
+
+        /* --- Buttons --- */
+        .btn {
+            padding: 12px 22px;
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 14px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.25s var(--ios-spring);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .btn:active {
+            transform: scale(0.96);
+        }
+
+        .btn-fetch { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; }
+        .btn-fetch:hover { box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35); }
+        
+        .btn-primary { background: linear-gradient(135deg, #16a34a, #15803d); color: white; }
+        .btn-primary:hover { box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35); }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* --- Sub Tabs Action Buttons --- */
+        .sub-tab-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .tab-btn-card {
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #92d050, #76b033);
+            border: 1px solid #639a26;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 800;
+            color: #000000;
+            transition: all 0.3s var(--ios-spring);
+            text-align: center;
+            box-shadow: 0 6px 15px rgba(146, 208, 80, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .tab-btn-card:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 10px 20px rgba(146, 208, 80, 0.4);
+        }
+
+        .tab-btn-card:active {
+            transform: scale(0.97);
+        }
+
+        .section-view { display: none; }
+        .section-view.active { display: block; animation: popupBounce 0.4s var(--ios-spring); }
+
+        /* --- Table Styling Preserved --- */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid #333;
+            margin-bottom: 20px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: center;
+            background: #fff;
+        }
+
+        th, td {
+            border: 1px solid #333;
+            padding: 8px 10px;
+        }
+
+        th {
+            background-color: var(--header-bg);
+            font-weight: bold;
+            color: #000;
+        }
+
+        tr.bg-blue { background-color: #d9e1f2; }
+        tr.bg-white { background-color: #ffffff; }
+        tr.summary-row { background-color: var(--header-bg); font-weight: bold; }
+
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        /* --- Modal Bounce Popup Table Preview --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            z-index: 9995;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-bounce-content {
+            background: #ffffff;
+            width: 100%;
+            max-width: 1150px;
+            max-height: 90vh;
+            border-radius: 28px;
+            padding: 25px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+            transform: scale(0.8) translateY(30px);
+            transition: transform 0.4s var(--ios-spring);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+
+        .modal-overlay.active .modal-bounce-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: #166534;
+        }
+
+        .modal-close {
+            background: #f1f5f9;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #64748b;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
+        .modal-body {
+            overflow-y: auto;
+            flex: 1;
+            padding-right: 4px;
+        }
+
+        @keyframes popupBounce {
+            0% { transform: scale(0.9) translateY(10px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+        /* --- Responsive Queries for Mobile Devices --- */
+        @media (max-width: 768px) {
+            body { padding: 12px 6px; }
+            .container { padding: 18px 14px; border-radius: 20px; }
+            h1 { font-size: 20px; }
+            .action-bar { padding: 14px; flex-direction: column; align-items: stretch; text-align: center; }
+            .btn { width: 100%; }
+            .config-panel { grid-template-columns: 1fr; padding: 16px; }
+            .config-group input[type="text"] { width: 100% !important; }
+            .sub-tab-grid { grid-template-columns: 1fr; }
+            .modal-bounce-content { padding: 16px; max-height: 95vh; border-radius: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Ambient Moving Background -->
+<div class="ambient-bg">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+</div>
+
+<!-- Welcome Splash Screen -->
+<div id="splashScreen">
+    <div class="splash-logo">📖</div>
+    <div class="splash-title">Rekap Presisi Absensi Mutaallim</div>
+    <div class="splash-sub">Sistem Integrasi Online MTQ & MQS</div>
+</div>
+
+<!-- iOS Dynamic Island Notification Toast Container -->
+<div class="ios-toast-container">
+    <div id="iosToast" class="ios-toast">
+        <div class="toast-icon" id="toastIcon">✨</div>
+        <div id="toastMessage">Selamat datang di Sistem Rekap Presisi Online!</div>
+    </div>
+</div>
+
+<!-- Sleek Data Loading Overlay -->
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loader-card">
+        <div class="spinner-ios"></div>
+        <div style="font-weight: 800; font-size: 16px; color: #1e293b;">Menyerap Data Online...</div>
+        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Mengambil data Spreadsheet Master & Taklimda</div>
+    </div>
+</div>
+
+<!-- Pop-up Bounce Modal for Interactive Table Preview -->
+<div id="tableModal" class="modal-overlay">
+    <div class="modal-bounce-content">
+        <div class="modal-header">
+            <div class="modal-title" id="modalTableTitle">📋 Pratinjau Laporan</div>
+            <button class="modal-close" onclick="closeTableModal()">✕</button>
+        </div>
+        <div class="modal-body" id="modalTableBody">
+            <!-- Table dynamically injected here -->
+        </div>
+    </div>
+</div>
+
+<!-- Hidden Store Container for Rendered Tables -->
+<div id="hiddenTableStore" style="display: none;">
+    <div id="tabMTQDaerah"></div>
+    <div id="tabMTQMarhalah"></div>
+    <div id="tabMQSDaerah"></div>
+    <div id="tabMQSJilid"></div>
+</div>
+
+<div class="container">
+    <header>
+        <h1>📖 Rekap Presisi Absensi Online (MTQ & MQS)</h1>
+        <p class="subtitle">Otomatis Mengambil & Mengolah Data dari Spreadsheet Master & Database Rekap Taklimda</p>
+    </header>
+
+    <!-- Action Bar -->
+    <div class="action-bar">
+        <div>
+            <strong style="font-size: 13px; color: #475569;">STATUS DATA ONLINE: </strong>
+            <span id="loadStateText" style="color: #64748b; font-weight: 700;">Belum dimuat</span>
+        </div>
+        <button class="btn btn-fetch" id="btnSync" onclick="fetchDataOnline()">🔄 Ambil & Olah Data Online</button>
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <div class="main-nav">
+        <button class="nav-btn active" id="btnNavMTQ" onclick="switchMainMode('MTQ')">📘 REKAP MTQ</button>
+        <button class="nav-btn" id="btnNavMQS" onclick="switchMainMode('MQS')">📗 REKAP MQS</button>
+    </div>
+
+    <!-- Config Panel Global -->
+    <div class="config-panel">
+        <div class="config-group">
+            <label for="selectBulan">🌙 Bulan Hijriah</label>
+            <select id="selectBulan" onchange="onFilterChange()">
+                <option value="ALL">Semua Bulan</option>
+            </select>
+        </div>
+        <div class="config-group">
+            <label for="selectTahun">📅 Tahun Hijriah</label>
+            <select id="selectTahun" onchange="onFilterChange()">
+                <option value="ALL">Semua Tahun</option>
+            </select>
+        </div>
+        <div class="config-group">
+            <label for="customHariAktif">⚙️ Setting Hari Aktif</label>
+            <input type="number" id="customHariAktif" value="18" min="1" max="365" style="text-align: center;" onchange="recalculateAndRenderAll()">
+        </div>
+        <div class="config-group" id="groupTitleMTQ">
+            <label for="titleHeaderMTQ">📌 Judul Laporan MTQ</label>
+            <input type="text" id="titleHeaderMTQ" value="PRESENSI DAN ABSENSI MUTAALLIM MTQ" style="width: 100%;" onchange="recalculateAndRenderAll()">
+        </div>
+        <div class="config-group" id="groupTitleMQS" style="display: none;">
+            <label for="titleHeaderMQS">📌 Judul Laporan MQS</label>
+            <input type="text" id="titleHeaderMQS" value="PRESENSI DAN ABSENSI MUTAALLIM MQS" style="width: 100%;" onchange="recalculateAndRenderAll()">
+        </div>
+    </div>
+
+    <!-- SECTION VIEW MTQ -->
+    <div id="viewMTQ" class="section-view active">
+        <div style="margin-bottom: 20px;">
+            <button class="btn btn-primary" id="btnExportMTQ" onclick="exportExcelMTQ()" disabled>📥 Export Ke Excel MTQ (.xlsx)</button>
+        </div>
+        <div class="sub-tab-grid">
+            <button class="tab-btn-card" onclick="openSubTabModal('tabMTQDaerah', 'Rekap MTQ Berdasarkan Daerah')">
+                <span>1. Rekap MTQ Berdasarkan Daerah</span> 🔍
+            </button>
+            <button class="tab-btn-card" onclick="openSubTabModal('tabMTQMarhalah', 'Rekap MTQ Berdasarkan Marhalah')">
+                <span>2. Rekap MTQ Berdasarkan Marhalah</span> 🔍
+            </button>
+        </div>
+    </div>
+
+    <!-- SECTION VIEW MQS -->
+    <div id="viewMQS" class="section-view">
+        <div style="margin-bottom: 20px;">
+            <button class="btn btn-primary" id="btnExportMQS" onclick="exportExcelMQS()" disabled>📥 Export Ke Excel MQS (.xlsx)</button>
+        </div>
+        <div class="sub-tab-grid">
+            <button class="tab-btn-card" onclick="openSubTabModal('tabMQSDaerah', 'Rekap MQS Berdasarkan Daerah')">
+                <span>1. Rekap MQS Berdasarkan Daerah</span> 🔍
+            </button>
+            <button class="tab-btn-card" onclick="openSubTabModal('tabMQSJilid', 'Rekap MQS Berdasarkan Jilid/Kategori')">
+                <span>2. Rekap MQS Berdasarkan Jilid/Kategori</span> 🔍
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const URL_MASTER = "https://script.google.com/macros/s/AKfycbzV_l5rAXgnapi2c3ZH90WOusrHgN-Ny9wjaFJ9tczCl1mkz1pURw_sZUYhEF4YY6byRg/exec";
+    const URL_TAKLIMDA = "https://script.google.com/macros/s/AKfycbz1ecMJ8KBdbsNhuJCm_eYrRH2ATxZH7sn73GV-B19JoxKLNMrS8BCS8fZNnHBcqjM/exec";
+
+    // Global Stores
+    let masterDomisiliMap = new Map();
+    let dbSantriMtqMap = new Map();
+    let dbSantriMqsMap = new Map();
+    let rawTaklimdaList = []; 
+    
+    let absenDataMtqMap = new Map();
+    let absenDataMqsMap = new Map();
+
+    let rekapMtqDaerah = [], rekapMtqMarhalah = [];
+    let rekapMqsDaerah = [], rekapMqsJilid = [];
+    let isDataLoaded = false;
+    let currentMode = 'MTQ';
+
+    // Splash Screen Timer
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+            document.getElementById('splashScreen').classList.add('hide');
+        }, 1200);
+    });
+
+    // Dynamic Island Alert Function
+    function showIosToast(msg, isError = false) {
+        const toast = document.getElementById('iosToast');
+        const icon = document.getElementById('toastIcon');
+        const text = document.getElementById('toastMessage');
+
+        text.innerText = msg;
+        icon.innerText = isError ? '⚠️' : '✨';
+        toast.className = 'ios-toast show' + (isError ? ' error' : '');
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3800);
+    }
+
+    function cleanId(val) {
+        if (val === null || val === undefined) return '';
+        let str = String(val).trim();
+        if (str.endsWith('.0')) str = str.slice(0, -2);
+        return str;
+    }
+
+    function extractDaerahMTQ(domisiliStr) {
+        if (!domisiliStr || domisiliStr === '-') return 'LAIN';
+        let clean = domisiliStr.trim().toUpperCase();
+        let match = clean.match(/^([A-Z])[\s\-0-9]/);
+        if (match) return match[1];
+        if (clean.length === 1 && /[A-Z]/.test(clean)) return clean;
+        let match2 = clean.match(/^([A-Z])/);
+        if (match2 && "ABCDEFGHIJKLMNOPQRSTZ".includes(match2[1])) return match2[1];
+        return 'LAIN';
+    }
+
+    function extractDaerahMQS(domisiliStr) {
+        if (!domisiliStr || domisiliStr === '-') return 'LAIN';
+        let clean = domisiliStr.trim().toUpperCase();
+        let match = clean.match(/^([A-Z])[\s\-0-9]/);
+        if (match) return 'DAERAH ' + match[1];
+        if (clean.length === 1 && /[A-Z]/.test(clean)) return 'DAERAH ' + clean;
+        let match2 = clean.match(/^([A-Z])/);
+        if (match2 && "ABCDEFGHIJKLMNOPQRSTZ".includes(match2[1])) return 'DAERAH ' + match2[1];
+        return 'LAIN';
+    }
+
+    function normalizeMarhalahMTQ(raw) {
+        if (!raw) return 'MARHALAH 1';
+        let str = raw.trim().toUpperCase();
+        if (str.startsWith('1')) return 'MARHALAH 1';
+        if (str.startsWith('2')) return 'MARHALAH 2';
+        if (str.startsWith('3')) return 'MARHALAH 3';
+        if (str.startsWith('4')) return 'MARHALAH 4';
+        if (str.startsWith('5')) return 'MARHALAH 5';
+        if (str.startsWith('6')) return 'MARHALAH 6';
+        if (str.includes('INT')) return 'INT';
+        if (str.includes('SAB')) return "SAB'AH";
+        if (str.includes('PASCA')) return 'PASCA';
+        return 'MARHALAH 1';
+    }
+
+    function normalizeJilidMQS(raw) {
+        if (!raw) return 'Jilid 1';
+        let str = raw.trim().toUpperCase();
+        if (str.includes('GHORIB') || str.includes('GHARIB')) return 'Ghorib';
+        if (str.includes('QURAN') || str.includes("QUR'AN")) return 'Quran';
+        if (str.includes('1') || str.endsWith('1')) return 'Jilid 1';
+        if (str.includes('2') || str.endsWith('2')) return 'Jilid 2';
+        if (str.includes('3') || str.endsWith('3')) return 'Jilid 3';
+        if (str.includes('4') || str.endsWith('4')) return 'Jilid 4';
+        if (str.includes('5') || str.endsWith('5')) return 'Jilid 5';
+        return 'Jilid 1';
+    }
+
+    async function fetchDataOnline() {
+        document.getElementById('loadingOverlay').classList.add('active');
+        document.getElementById('btnSync').disabled = true;
+
+        try {
+            const [resMaster, resTaklimda] = await Promise.all([
+                fetch(URL_MASTER).then(r => r.json()),
+                fetch(URL_TAKLIMDA + '?action=getAllInitData').then(r => r.json())
+            ]);
+
+            parseMasterData(resMaster);
+            
+            if (Array.isArray(resTaklimda)) {
+                rawTaklimdaList = resTaklimda;
+            } else if (resTaklimda && resTaklimda.rekap) {
+                rawTaklimdaList = resTaklimda.rekap;
+            } else {
+                rawTaklimdaList = [];
+            }
+
+            populateMonthYearDropdowns();
+
+            isDataLoaded = true;
+            document.getElementById('loadStateText').innerText = "✅ Terhubung & Siap";
+            document.getElementById('loadStateText').style.color = "#16a34a";
+            document.getElementById('btnExportMTQ').disabled = false;
+            document.getElementById('btnExportMQS').disabled = false;
+
+            onFilterChange();
+            showIosToast("Berhasil memuat data dari Spreadsheet Master & Database Rekap!", false);
+        } catch (err) {
+            console.error(err);
+            showIosToast("Gagal mengambil data: " + err.message, true);
+        } finally {
+            document.getElementById('loadingOverlay').classList.remove('active');
+            document.getElementById('btnSync').disabled = false;
+        }
+    }
+
+    function parseMasterData(res) {
+        masterDomisiliMap.clear();
+        dbSantriMtqMap.clear();
+        dbSantriMqsMap.clear();
+
+        const headersUtama = res.headersUtama || [];
+        const dataUtama = res.dataUtama || [];
+
+        let idxId = headersUtama.findIndex(h => String(h).toUpperCase().includes('ID'));
+        let idxDom = headersUtama.findIndex(h => String(h).toUpperCase().includes('DOMISILI') && !String(h).toUpperCase().includes('STATUS'));
+        
+        if (idxId === -1) idxId = 0;
+        if (idxDom === -1) idxDom = 6;
+
+        dataUtama.forEach(row => {
+            let id = cleanId(row[idxId]);
+            let dom = String(row[idxDom] || '').trim();
+            if (id) masterDomisiliMap.set(id, dom);
+        });
+
+        const mutaallimMap = res.mutaallimMap || {};
+        for (let rawId in mutaallimMap) {
+            let id = cleanId(rawId);
+            let item = mutaallimMap[rawId];
+            let kategori = String(item["KATEGORI BARU"] || item["KATEGORI"] || '').toUpperCase();
+            let rawMarhalah = String(item["JILID/MARHALAH BARU"] || item["JILID/MARHALAH"] || item["JILID BARU"] || item["MARHALAH BARU"] || item["JILID"] || item["MARHALAH"] || '').trim();
+
+            let dom = masterDomisiliMap.get(id) || '-';
+
+            if (kategori.includes('MTQ') || (!kategori && rawMarhalah)) {
+                dbSantriMtqMap.set(id, {
+                    id: id,
+                    domisili: dom,
+                    daerah: extractDaerahMTQ(dom),
+                    marhalah: normalizeMarhalahMTQ(rawMarhalah)
+                });
+            }
+
+            if (kategori.includes('MQS')) {
+                dbSantriMqsMap.set(id, {
+                    id: id,
+                    domisili: dom,
+                    daerah: extractDaerahMQS(dom),
+                    jilid: normalizeJilidMQS(rawMarhalah)
+                });
+            }
+        }
+    }
+
+    function populateMonthYearDropdowns() {
+        let bulanSet = new Set();
+        let tahunSet = new Set();
+
+        rawTaklimdaList.forEach(row => {
+            if (row._source && row._source !== 'database') return;
+            let b = row.bulanhijriah || row.bulan || '';
+            let y = row.tahunhijriah || row.tahun || '';
+            if (b && b !== '-' && b !== 'undefined') bulanSet.add(b.trim());
+            if (y && y !== '-' && y !== 'undefined') tahunSet.add(y.trim());
+        });
+
+        const selectBulan = document.getElementById('selectBulan');
+        const selectTahun = document.getElementById('selectTahun');
+
+        selectBulan.innerHTML = '<option value="ALL">Semua Bulan</option>';
+        selectTahun.innerHTML = '<option value="ALL">Semua Tahun</option>';
+
+        bulanSet.forEach(b => {
+            selectBulan.innerHTML += `<option value="${b}">${b}</option>`;
+        });
+        tahunSet.forEach(y => {
+            selectTahun.innerHTML += `<option value="${y}">${y}</option>`;
+        });
+
+        if (bulanSet.size > 0) selectBulan.selectedIndex = 1; 
+        if (tahunSet.size > 0) selectTahun.selectedIndex = 1;
+    }
+
+    function onFilterChange() {
+        if (!isDataLoaded) return;
+
+        const selBulan = document.getElementById('selectBulan').value;
+        const selTahun = document.getElementById('selectTahun').value;
+
+        let textBulanTahun = "";
+        if (selBulan !== 'ALL') textBulanTahun += selBulan.toUpperCase() + " ";
+        if (selTahun !== 'ALL') textBulanTahun += selTahun + " H";
+        if (!textBulanTahun) textBulanTahun = "MUHARROM 1447 H";
+
+        document.getElementById('titleHeaderMTQ').value = `PRESENSI DAN ABSENSI MUTAALLIM MTQ ${textBulanTahun.trim()}`;
+        document.getElementById('titleHeaderMQS').value = `PRESENSI DAN ABSENSI MUTAALLIM MQS ${textBulanTahun.trim()}.`;
+
+        parseTaklimdaDataFiltered(selBulan, selTahun);
+        recalculateAndRenderAll();
+    }
+
+    function parseTaklimdaDataFiltered(filterBulan, filterTahun) {
+        absenDataMtqMap.clear();
+        absenDataMqsMap.clear();
+
+        rawTaklimdaList.forEach(row => {
+            if (row._source && row._source !== 'database') return;
+
+            let rowBulan = String(row.bulanhijriah || row.bulan || '').trim();
+            let rowTahun = String(row.tahunhijriah || row.tahun || '').trim();
+
+            if (filterBulan !== 'ALL' && rowBulan.toLowerCase() !== filterBulan.toLowerCase()) return;
+            if (filterTahun !== 'ALL' && rowTahun.toLowerCase() !== filterTahun.toLowerCase()) return;
+
+            let id = cleanId(row.idpps || row.id);
+            let s = parseInt(row.totalsakit) || 0;
+            let i = parseInt(row.totalizin) || 0;
+            let a = parseInt(row.totalalpa || row.totalalpha) || 0;
+            let kategori = String(row.kategori || '').toUpperCase();
+            let dom = String(row.domisili || '').trim();
+            let rawMarhalah = String(row.marhalahjilid || row.marhalah || row.jilid || '').trim();
+
+            if (!id) return;
+
+            if (dbSantriMtqMap.has(id) || kategori.includes('MTQ')) {
+                if (!absenDataMtqMap.has(id)) {
+                    absenDataMtqMap.set(id, { id, s: 0, i: 0, a: 0, dom, marhalah: rawMarhalah });
+                }
+                let rec = absenDataMtqMap.get(id);
+                rec.s += s; rec.i += i; rec.a += a;
+            }
+
+            if (dbSantriMqsMap.has(id) || kategori.includes('MQS')) {
+                if (!absenDataMqsMap.has(id)) {
+                    absenDataMqsMap.set(id, { id, s: 0, i: 0, a: 0, dom, jilid: rawMarhalah });
+                }
+                let rec = absenDataMqsMap.get(id);
+                rec.s += s; rec.i += i; rec.a += a;
+            }
+        });
+    }
+
+    function recalculateAndRenderAll() {
+        if (!isDataLoaded) return;
+        const hariAktif = parseInt(document.getElementById('customHariAktif').value) || 18;
+
+        // 1. PROSES MTQ
+        let daerahMtqMap = new Map();
+        ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","Z"].forEach(d => {
+            daerahMtqMap.set(d, { daerah: d, jumlah: 0, s: 0, i: 0, a: 0 });
+        });
+
+        let marhalahMtqMap = new Map();
+        ["MARHALAH 1", "MARHALAH 2", "MARHALAH 3", "MARHALAH 4", "MARHALAH 5", "MARHALAH 6", "INT", "SAB'AH", "PASCA"].forEach(m => {
+            marhalahMtqMap.set(m, { marhalah: m, jumlah: 0, s: 0, i: 0, a: 0 });
+        });
+
+        dbSantriMtqMap.forEach(santri => {
+            let dObj = daerahMtqMap.get(santri.daerah);
+            if (!dObj) { dObj = { daerah: santri.daerah, jumlah: 0, s: 0, i: 0, a: 0 }; daerahMtqMap.set(santri.daerah, dObj); }
+            dObj.jumlah++;
+
+            let mObj = marhalahMtqMap.get(santri.marhalah);
+            if (!mObj) { mObj = { marhalah: santri.marhalah, jumlah: 0, s: 0, i: 0, a: 0 }; marhalahMtqMap.set(santri.marhalah, mObj); }
+            mObj.jumlah++;
+        });
+
+        absenDataMtqMap.forEach(absen => {
+            let santri = dbSantriMtqMap.get(absen.id);
+            let daerah = santri ? santri.daerah : extractDaerahMTQ(absen.dom);
+            let marhalah = santri ? santri.marhalah : normalizeMarhalahMTQ(absen.marhalah);
+
+            let dObj = daerahMtqMap.get(daerah);
+            if (dObj) { dObj.s += absen.s; dObj.i += absen.i; dObj.a += absen.a; }
+
+            let mObj = marhalahMtqMap.get(marhalah);
+            if (mObj) { mObj.s += absen.s; mObj.i += absen.i; mObj.a += absen.a; }
+        });
+
+        rekapMtqDaerah = Array.from(daerahMtqMap.values());
+        rekapMtqDaerah.forEach(item => {
+            item.jmlAbsen = item.s + item.i + item.a;
+            item.mandays = item.jumlah * hariAktif;
+            item.pctAbsen = item.mandays > 0 ? (item.jmlAbsen / item.mandays) : 0;
+            item.pctHadir = 1 - item.pctAbsen;
+        });
+
+        let sortedRankMTQ = [...rekapMtqDaerah].sort((x, y) => y.pctHadir - x.pctHadir);
+        sortedRankMTQ.forEach((item, rIdx) => { item.rangking = rIdx + 1; });
+
+        rekapMtqMarhalah = Array.from(marhalahMtqMap.values());
+        rekapMtqMarhalah.forEach(item => {
+            item.jmlAbsen = item.s + item.i + item.a;
+            item.mandays = item.jumlah * hariAktif;
+            item.pctAbsen = item.mandays > 0 ? (item.jmlAbsen / item.mandays) : 0;
+            item.pctHadir = 1 - item.pctAbsen;
+        });
+
+        // 2. PROSES MQS
+        let daerahMqsMap = new Map();
+        let jilidMqsMap = new Map();
+        ["Jilid 1", "Jilid 2", "Jilid 3", "Jilid 4", "Jilid 5", "Ghorib", "Quran"].forEach(j => {
+            jilidMqsMap.set(j, { jilid: j, jumlah: 0, s: 0, i: 0, a: 0 });
+        });
+
+        dbSantriMqsMap.forEach(santri => {
+            let dObj = daerahMqsMap.get(santri.daerah);
+            if (!dObj) { dObj = { daerah: santri.daerah, jumlah: 0, s: 0, i: 0, a: 0 }; daerahMqsMap.set(santri.daerah, dObj); }
+            dObj.jumlah++;
+
+            let jObj = jilidMqsMap.get(santri.jilid);
+            if (!jObj) { jObj = { jilid: santri.jilid, jumlah: 0, s: 0, i: 0, a: 0 }; jilidMqsMap.set(santri.jilid, jObj); }
+            jObj.jumlah++;
+        });
+
+        absenDataMqsMap.forEach(absen => {
+            let santri = dbSantriMqsMap.get(absen.id);
+            let daerah = santri ? santri.daerah : extractDaerahMQS(absen.dom);
+            let jilid = santri ? santri.jilid : normalizeJilidMQS(absen.jilid);
+
+            let dObj = daerahMqsMap.get(daerah);
+            if (!dObj) { dObj = { daerah: daerah, jumlah: 0, s: 0, i: 0, a: 0 }; daerahMqsMap.set(daerah, dObj); }
+            dObj.s += absen.s; dObj.i += absen.i; dObj.a += absen.a;
+
+            let jObj = jilidMqsMap.get(jilid);
+            if (jObj) { jObj.s += absen.s; jObj.i += absen.i; jObj.a += absen.a; }
+        });
+
+        rekapMqsDaerah = Array.from(daerahMqsMap.values()).sort((a, b) => a.daerah.localeCompare(b.daerah));
+        rekapMqsDaerah.forEach(item => {
+            item.jmlAbsen = item.s + item.i + item.a;
+            item.mandays = item.jumlah * hariAktif;
+            item.pctAbsen = item.mandays > 0 ? (item.jmlAbsen / item.mandays) : 0;
+            item.pctHadir = 1 - item.pctAbsen;
+        });
+
+        rekapMqsJilid = Array.from(jilidMqsMap.values());
+        rekapMqsJilid.forEach(item => {
+            item.jmlAbsen = item.s + item.i + item.a;
+            item.mandays = item.jumlah * hariAktif;
+            item.pctAbsen = item.mandays > 0 ? (item.jmlAbsen / item.mandays) : 0;
+            item.pctHadir = 1 - item.pctAbsen;
+        });
+
+        renderAllTables(hariAktif);
+    }
+
+    function renderAllTables(hariAktif) {
+        const titleMTQ = document.getElementById('titleHeaderMTQ').value;
+        const titleMQS = document.getElementById('titleHeaderMQS').value;
+
+        // 1. Render MTQ Daerah
+        let totJmlD = 0, totSD = 0, totID = 0, totAD = 0, totAbsD = 0, totManD = 0;
+        let rowsMtqDaerahHTML = rekapMtqDaerah.map((r, idx) => {
+            totJmlD += r.jumlah; totSD += r.s; totID += r.i; totAD += r.a; totAbsD += r.jmlAbsen; totManD += r.mandays;
+            return `<tr class="${idx % 2 === 1 ? 'bg-blue' : 'bg-white'}">
+                <td><strong>${idx + 1}</strong></td><td><strong>${r.daerah}</strong></td><td><strong>${r.jumlah}</strong></td>
+                <td>${hariAktif}</td><td>${r.s || ''}</td><td>${r.i || ''}</td><td>${r.a || ''}</td><td><strong>${r.jmlAbsen}</strong></td>
+                <td class="text-right"><strong>${(r.pctAbsen * 100).toFixed(1).replace('.', ',')}%</strong></td>
+                <td class="text-right"><strong>${(r.pctHadir * 100).toFixed(1).replace('.', ',')}%</strong></td>
+                <td><strong>${r.rangking}</strong></td></tr>`;
+        }).join('');
+        let ovAbsD = totManD > 0 ? (totAbsD / totManD) : 0;
+
+        document.getElementById('tabMTQDaerah').innerHTML = `
+            <h2 style="text-align: center; margin-bottom: 15px; color: #15803d; font-size: 17px;">${titleMTQ} (BERDASARKAN DAERAH)</h2>
+            <div class="table-wrapper"><table>
+                <thead><tr><th rowspan="2">No</th><th rowspan="2">Daerah</th><th rowspan="2">Jumlah Mutaallim</th><th rowspan="2">Hari Aktif</th><th colspan="3">ABSEN MUTAALLIM</th><th colspan="3">Jumlah</th><th rowspan="2">Rangking</th></tr>
+                <tr><th>S</th><th>I</th><th>A</th><th>Jumlah</th><th>Absen</th><th>Hadir</th></tr></thead>
+                <tbody>${rowsMtqDaerahHTML}</tbody>
+                <tfoot>
+                    <tr class="summary-row">
+                        <td colspan="2">JUMLAH</td><td>${totJmlD}</td><td>${hariAktif}</td>
+                        <td>${totSD}</td><td>${totID}</td><td>${totAD}</td><td>${totAbsD}</td>
+                        <td class="text-right">${(ovAbsD * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsD) * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td></td>
+                    </tr>
+                    <tr class="summary-row">
+                        <td colspan="2">Prosentase</td><td>100%</td><td></td>
+                        <td>${totManD > 0 ? ((totSD/totManD)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManD > 0 ? ((totID/totManD)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManD > 0 ? ((totAD/totManD)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${(ovAbsD * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${(ovAbsD * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsD) * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table></div>`;
+
+        // 2. Render MTQ Marhalah
+        let totJmlM = 0, totSM = 0, totIM = 0, totAM = 0, totAbsM = 0, totManM = 0;
+        let rowsMtqMarhalahHTML = rekapMtqMarhalah.map((r, idx) => {
+            totJmlM += r.jumlah; totSM += r.s; totIM += r.i; totAM += r.a; totAbsM += r.jmlAbsen; totManM += r.mandays;
+            return `<tr class="${idx % 2 === 1 ? 'bg-blue' : 'bg-white'}">
+                <td><strong>${idx + 1}</strong></td><td class="text-center"><strong>${r.marhalah}</strong></td><td><strong>${r.jumlah}</strong></td>
+                <td>${hariAktif}</td><td>${r.s || ''}</td><td>${r.i || ''}</td><td>${r.a || ''}</td><td><strong>${r.jmlAbsen}</strong></td>
+                <td class="text-right"><strong>${(r.pctAbsen * 100).toFixed(1).replace('.', ',')}%</strong></td>
+                <td class="text-right"><strong>${(r.pctHadir * 100).toFixed(1).replace('.', ',')}%</strong></td></tr>`;
+        }).join('');
+        let ovAbsM = totManM > 0 ? (totAbsM / totManM) : 0;
+
+        document.getElementById('tabMTQMarhalah').innerHTML = `
+            <h2 style="text-align: center; margin-bottom: 15px; color: #15803d; font-size: 17px;">${titleMTQ} (BERDASARKAN MARHALAH)</h2>
+            <div class="table-wrapper"><table>
+                <thead><tr><th rowspan="2">No</th><th rowspan="2">Marhalah</th><th rowspan="2">Jumlah Mutaallim</th><th rowspan="2">Hari Aktif</th><th colspan="3">ABSEN MUTAALLIM</th><th colspan="3">Jumlah</th></tr>
+                <tr><th>S</th><th>I</th><th>A</th><th>Jumlah</th><th>Absen</th><th>Hadir</th></tr></thead>
+                <tbody>${rowsMtqMarhalahHTML}</tbody>
+                <tfoot>
+                    <tr class="summary-row">
+                        <td colspan="2">JUMLAH</td><td>${totJmlM}</td><td>${hariAktif}</td>
+                        <td>${totSM}</td><td>${totIM}</td><td>${totAM}</td><td>${totAbsM}</td>
+                        <td class="text-right">${(ovAbsM * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsM) * 100).toFixed(1).replace('.', ',')}%</td>
+                    </tr>
+                    <tr class="summary-row">
+                        <td colspan="2">Prosentase</td><td>100%</td><td></td>
+                        <td>${totManM > 0 ? ((totSM/totManM)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManM > 0 ? ((totIM/totManM)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManM > 0 ? ((totAM/totManM)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${(ovAbsM * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${(ovAbsM * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsM) * 100).toFixed(1).replace('.', ',')}%</td>
+                    </tr>
+                </tfoot>
+            </table></div>`;
+
+        // 3. Render MQS Daerah
+        let totJmlMqsD = 0, totSMqsD = 0, totIMqsD = 0, totAMqsD = 0, totAbsMqsD = 0, totManMqsD = 0;
+        let rowsMqsDaerahHTML = rekapMqsDaerah.map((r, idx) => {
+            totJmlMqsD += r.jumlah; totSMqsD += r.s; totIMqsD += r.i; totAMqsD += r.a; totAbsMqsD += r.jmlAbsen; totManMqsD += r.mandays;
+            return `<tr class="${idx % 2 === 1 ? 'bg-blue' : 'bg-white'}">
+                <td><strong>${idx + 1}</strong></td><td class="text-center"><strong>${r.daerah}</strong></td><td><strong>${r.jumlah}</strong></td>
+                <td>${hariAktif}</td><td>${r.s || ''}</td><td>${r.i || ''}</td><td>${r.a || ''}</td><td><strong>${r.jmlAbsen}</strong></td>
+                <td class="text-right"><strong>${(r.pctAbsen * 100).toFixed(1).replace('.', ',')}%</strong></td>
+                <td class="text-right"><strong>${(r.pctHadir * 100).toFixed(1).replace('.', ',')}%</strong></td></tr>`;
+        }).join('');
+        let ovAbsMqsD = totManMqsD > 0 ? (totAbsMqsD / totManMqsD) : 0;
+
+        document.getElementById('tabMQSDaerah').innerHTML = `
+            <h2 style="text-align: center; margin-bottom: 15px; color: #15803d; font-size: 17px;">${titleMQS} (BERDASARKAN DAERAH)</h2>
+            <div class="table-wrapper"><table>
+                <thead><tr><th rowspan="2">NO</th><th rowspan="2">DAERAH</th><th rowspan="2">Jumlah Mutaallim</th><th rowspan="2">Hari Aktif</th><th colspan="3">ABSEN MUTAALLIM</th><th rowspan="2">Jumlah</th><th colspan="2">Prosentase</th></tr>
+                <tr><th>S</th><th>I</th><th>A</th><th>Absen</th><th>Hadir</th></tr></thead>
+                <tbody>${rowsMqsDaerahHTML}</tbody>
+                <tfoot>
+                    <tr class="summary-row">
+                        <td colspan="2">JUMLAH</td><td>${totJmlMqsD}</td><td>${hariAktif}</td>
+                        <td>${totSMqsD}</td><td>${totIMqsD}</td><td>${totAMqsD}</td><td>${totAbsMqsD}</td>
+                        <td class="text-right">${(ovAbsMqsD * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsMqsD) * 100).toFixed(1).replace('.', ',')}%</td>
+                    </tr>
+                    <tr class="summary-row">
+                        <td colspan="2">Prosentase</td><td>100%</td><td></td>
+                        <td>${totManMqsD > 0 ? ((totSMqsD/totManMqsD)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManMqsD > 0 ? ((totIMqsD/totManMqsD)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManMqsD > 0 ? ((totAMqsD/totManMqsD)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${(ovAbsMqsD * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${(ovAbsMqsD * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsMqsD) * 100).toFixed(1).replace('.', ',')}%</td>
+                    </tr>
+                </tfoot>
+            </table></div>`;
+
+        // 4. Render MQS Jilid
+        let totJmlMqsJ = 0, totSMqsJ = 0, totIMqsJ = 0, totAMqsJ = 0, totAbsMqsJ = 0, totManMqsJ = 0;
+        let rowsMqsJilidHTML = rekapMqsJilid.map((r, idx) => {
+            totJmlMqsJ += r.jumlah; totSMqsJ += r.s; totIMqsJ += r.i; totAMqsJ += r.a; totAbsMqsJ += r.jmlAbsen; totManMqsJ += r.mandays;
+            return `<tr class="${idx % 2 === 1 ? 'bg-blue' : 'bg-white'}">
+                <td><strong>${idx + 1}</strong></td><td class="text-center"><strong>${r.jilid}</strong></td><td><strong>${r.jumlah}</strong></td>
+                <td>${hariAktif}</td><td>${r.s || ''}</td><td>${r.i || ''}</td><td>${r.a || ''}</td><td><strong>${r.jmlAbsen}</strong></td>
+                <td class="text-right"><strong>${(r.pctAbsen * 100).toFixed(1).replace('.', ',')}%</strong></td>
+                <td class="text-right"><strong>${(r.pctHadir * 100).toFixed(1).replace('.', ',')}%</strong></td></tr>`;
+        }).join('');
+        let ovAbsMqsJ = totManMqsJ > 0 ? (totAbsMqsJ / totManMqsJ) : 0;
+
+        document.getElementById('tabMQSJilid').innerHTML = `
+            <h2 style="text-align: center; margin-bottom: 15px; color: #15803d; font-size: 17px;">${titleMQS} (BERDASARKAN JILID / KATEGORI)</h2>
+            <div class="table-wrapper"><table>
+                <thead><tr><th rowspan="2">No</th><th rowspan="2">Kategori</th><th rowspan="2">Jumlah Mutaallim</th><th rowspan="2">Hari Aktif</th><th colspan="3">ABSEN MUTAALLIM</th><th rowspan="2">Jumlah</th><th colspan="2">Prosentase</th></tr>
+                <tr><th>S</th><th>I</th><th>A</th><th>Absen</th><th>Hadir</th></tr></thead>
+                <tbody>${rowsMqsJilidHTML}</tbody>
+                <tfoot>
+                    <tr class="summary-row">
+                        <td colspan="2">JUMLAH / TOTAL</td><td>${totJmlMqsJ}</td><td>${hariAktif}</td>
+                        <td>${totSMqsJ}</td><td>${totIMqsJ}</td><td>${totAMqsJ}</td><td>${totAbsMqsJ}</td>
+                        <td class="text-right">${(ovAbsMqsJ * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsMqsJ) * 100).toFixed(1).replace('.', ',')}%</td>
+                    </tr>
+                    <tr class="summary-row">
+                        <td colspan="2">Prosentase</td><td>100%</td><td></td>
+                        <td>${totManMqsJ > 0 ? ((totSMqsJ/totManMqsJ)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManMqsJ > 0 ? ((totIMqsJ/totManMqsJ)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${totManMqsJ > 0 ? ((totAMqsJ/totManMqsJ)*100).toFixed(1).replace('.', ',') : '0,0'}%</td>
+                        <td>${(ovAbsMqsJ * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${(ovAbsMqsJ * 100).toFixed(1).replace('.', ',')}%</td>
+                        <td class="text-right">${((1-ovAbsMqsJ) * 100).toFixed(1).replace('.', ',')}%</td>
+                    </tr>
+                </tfoot>
+            </table></div>`;
+    }
+
+    /* Interactive Sub Tab Click Trigger for Modal Bounce Preview */
+    function openSubTabModal(tabId, tabTitle) {
+        if (!isDataLoaded) {
+            showIosToast("Data online belum dimuat! Silakan klik Ambil & Olah Data Online dulu.", true);
+            return;
+        }
+
+        const tableHtml = document.getElementById(tabId).innerHTML;
+        if (!tableHtml || tableHtml.trim() === "") {
+            showIosToast("Data laporan belum tersedia.", true);
+            return;
+        }
+
+        document.getElementById('modalTableTitle').innerText = `📋 Pratinjau: ${tabTitle}`;
+        document.getElementById('modalTableBody').innerHTML = tableHtml;
+        document.getElementById('tableModal').classList.add('active');
+    }
+
+    function closeTableModal() {
+        document.getElementById('tableModal').classList.remove('active');
+    }
+
+    function switchMainMode(mode) {
+        currentMode = mode;
+        document.getElementById('btnNavMTQ').classList.toggle('active', mode === 'MTQ');
+        document.getElementById('btnNavMQS').classList.toggle('active', mode === 'MQS');
+
+        document.getElementById('viewMTQ').classList.toggle('active', mode === 'MTQ');
+        document.getElementById('viewMQS').classList.toggle('active', mode === 'MQS');
+
+        document.getElementById('groupTitleMTQ').style.display = mode === 'MTQ' ? 'flex' : 'none';
+        document.getElementById('groupTitleMQS').style.display = mode === 'MQS' ? 'flex' : 'none';
+    }
+
+    /* --- EXPORT EXCEL MTQ (UNTOUCHED FORMULAS & STYLES) --- */
+    async function exportExcelMTQ() {
+        if (rekapMtqDaerah.length === 0) return;
+        const wb = new ExcelJS.Workbook();
+        const hariAktif = parseInt(document.getElementById('customHariAktif').value) || 18;
+        const titleText = document.getElementById('titleHeaderMTQ').value;
+
+        const greenFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92D050' } };
+        const blueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+        const whiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+
+        const headerFont = { name: 'Calibri', size: 11, bold: true };
+        const regularFont = { name: 'Calibri', size: 11, bold: false };
+        const boldFont = { name: 'Calibri', size: 11, bold: true };
+        const thinBorder = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+        // Sheet 1 MTQ Daerah
+        const wsD = wb.addWorksheet('Rekap Daerah');
+        wsD.views = [{ showGridLines: true }];
+        wsD.mergeCells('A1:K1');
+        wsD.getCell('A1').value = titleText;
+        wsD.getCell('A1').font = { name: 'Calibri', size: 14, bold: true };
+        wsD.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsD.mergeCells('A3:A4'); wsD.getCell('A3').value = 'No';
+        wsD.mergeCells('B3:B4'); wsD.getCell('B3').value = 'Daerah';
+        wsD.mergeCells('C3:C4'); wsD.getCell('C3').value = 'Jumlah Mutaallim';
+        wsD.mergeCells('D3:D4'); wsD.getCell('D3').value = 'Hari Aktif';
+        wsD.mergeCells('E3:G3'); wsD.getCell('E3').value = 'ABSEN MUTAALLIM';
+        wsD.mergeCells('H3:J3'); wsD.getCell('H3').value = 'Jumlah';
+        wsD.mergeCells('K3:K4'); wsD.getCell('K3').value = 'Rangking';
+
+        wsD.getCell('E4').value = 'S'; wsD.getCell('F4').value = 'I'; wsD.getCell('G4').value = 'A';
+        wsD.getCell('H4').value = 'Jumlah'; wsD.getCell('I4').value = 'Absen'; wsD.getCell('J4').value = 'Hadir';
+
+        for (let r = 3; r <= 4; r++) {
+            for (let c = 1; c <= 11; c++) {
+                let cell = wsD.getCell(r, c); cell.fill = greenFill; cell.font = headerFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = thinBorder;
+            }
+        }
+
+        let startRowD = 5;
+        rekapMtqDaerah.forEach((row, idx) => {
+            let rIdx = startRowD + idx;
+            let fill = (idx % 2 === 1) ? blueFill : whiteFill;
+            wsD.getCell(rIdx, 1).value = idx + 1;
+            wsD.getCell(rIdx, 2).value = row.daerah;
+            wsD.getCell(rIdx, 3).value = row.jumlah;
+            wsD.getCell(rIdx, 4).value = hariAktif;
+            wsD.getCell(rIdx, 5).value = row.s || null;
+            wsD.getCell(rIdx, 6).value = row.i || null;
+            wsD.getCell(rIdx, 7).value = row.a || null;
+            wsD.getCell(rIdx, 8).value = { formula: `SUM(E${rIdx}:G${rIdx})` };
+            wsD.getCell(rIdx, 9).value = { formula: `H${rIdx}/(C${rIdx}*D${rIdx})` };
+            wsD.getCell(rIdx, 10).value = { formula: `1-I${rIdx}` };
+            wsD.getCell(rIdx, 11).value = { formula: `RANK(J${rIdx},$J$5:$J$${startRowD + rekapMtqDaerah.length - 1})` };
+
+            for (let c = 1; c <= 11; c++) {
+                let cell = wsD.getCell(rIdx, c); cell.fill = fill; cell.border = thinBorder;
+                cell.font = [1, 2, 3, 8, 11].includes(c) ? boldFont : regularFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                if ([3, 5, 6, 7, 8].includes(c) && cell.value !== null) cell.numFmt = '#,##0';
+                if ([9, 10].includes(c)) { cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.numFmt = '0.0%'; }
+            }
+        });
+
+        let endRowD = startRowD + rekapMtqDaerah.length - 1;
+        let sumRowD1 = endRowD + 1, sumRowD2 = endRowD + 2;
+
+        wsD.mergeCells(`A${sumRowD1}:B${sumRowD1}`); wsD.getCell(`A${sumRowD1}`).value = 'JUMLAH';
+        wsD.getCell(`C${sumRowD1}`).value = { formula: `SUM(C${startRowD}:C${endRowD})` };
+        wsD.getCell(`D${sumRowD1}`).value = hariAktif;
+        wsD.getCell(`E${sumRowD1}`).value = { formula: `SUM(E${startRowD}:E${endRowD})` };
+        wsD.getCell(`F${sumRowD1}`).value = { formula: `SUM(F${startRowD}:F${endRowD})` };
+        wsD.getCell(`G${sumRowD1}`).value = { formula: `SUM(G${startRowD}:G${endRowD})` };
+        wsD.getCell(`H${sumRowD1}`).value = { formula: `SUM(H${startRowD}:H${endRowD})` };
+        wsD.getCell(`I${sumRowD1}`).value = { formula: `H${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`J${sumRowD1}`).value = { formula: `1-I${sumRowD1}` };
+
+        for (let c = 1; c <= 11; c++) {
+            let cell = wsD.getCell(sumRowD1, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([9, 10].includes(c)) cell.numFmt = '0.0%'; else if (c >= 3) cell.numFmt = '#,##0';
+        }
+
+        wsD.mergeCells(`A${sumRowD2}:B${sumRowD2}`); wsD.getCell(`A${sumRowD2}`).value = 'Prosentase';
+        wsD.getCell(`C${sumRowD2}`).value = 1.0;
+        wsD.getCell(`E${sumRowD2}`).value = { formula: `E${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`F${sumRowD2}`).value = { formula: `F${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`G${sumRowD2}`).value = { formula: `G${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`H${sumRowD2}`).value = { formula: `H${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`I${sumRowD2}`).value = { formula: `I${sumRowD1}` };
+        wsD.getCell(`J${sumRowD2}`).value = { formula: `J${sumRowD1}` };
+
+        for (let c = 1; c <= 11; c++) {
+            let cell = wsD.getCell(sumRowD2, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([3, 5, 6, 7, 8, 9, 10].includes(c)) cell.numFmt = '0.0%';
+        }
+
+        wsD.columns = [{ width: 6 }, { width: 12 }, { width: 18 }, { width: 12 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 12 }];
+
+        // Sheet 2 MTQ Marhalah
+        const wsM = wb.addWorksheet('Rekap Marhalah');
+        wsM.views = [{ showGridLines: true }];
+        wsM.mergeCells('A1:J1'); wsM.getCell('A1').value = titleText;
+        wsM.getCell('A1').font = { name: 'Calibri', size: 14, bold: true };
+        wsM.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsM.mergeCells('A3:A4'); wsM.getCell('A3').value = 'No';
+        wsM.mergeCells('B3:B4'); wsM.getCell('B3').value = 'Marhalah';
+        wsM.mergeCells('C3:C4'); wsM.getCell('C3').value = 'Jumlah Mutaallim';
+        wsM.mergeCells('D3:D4'); wsM.getCell('D3').value = 'Hari Aktif';
+        wsM.mergeCells('E3:G3'); wsM.getCell('E3').value = 'ABSEN MUTAALLIM';
+        wsM.mergeCells('H3:J3'); wsM.getCell('H3').value = 'Jumlah';
+
+        wsM.getCell('E4').value = 'S'; wsM.getCell('F4').value = 'I'; wsM.getCell('G4').value = 'A';
+        wsM.getCell('H4').value = 'Jumlah'; wsM.getCell('I4').value = 'Absen'; wsM.getCell('J4').value = 'Hadir';
+
+        for (let r = 3; r <= 4; r++) {
+            for (let c = 1; c <= 10; c++) {
+                let cell = wsM.getCell(r, c); cell.fill = greenFill; cell.font = headerFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = thinBorder;
+            }
+        }
+
+        let startRowM = 5;
+        rekapMtqMarhalah.forEach((row, idx) => {
+            let rIdx = startRowM + idx;
+            let fill = (idx % 2 === 1) ? blueFill : whiteFill;
+            wsM.getCell(rIdx, 1).value = idx + 1;
+            wsM.getCell(rIdx, 2).value = row.marhalah;
+            wsM.getCell(rIdx, 3).value = row.jumlah;
+            wsM.getCell(rIdx, 4).value = hariAktif;
+            wsM.getCell(rIdx, 5).value = row.s || null;
+            wsM.getCell(rIdx, 6).value = row.i || null;
+            wsM.getCell(rIdx, 7).value = row.a || null;
+            wsM.getCell(rIdx, 8).value = { formula: `SUM(E${rIdx}:G${rIdx})` };
+            wsM.getCell(rIdx, 9).value = { formula: `H${rIdx}/(C${rIdx}*D${rIdx})` };
+            wsM.getCell(rIdx, 10).value = { formula: `1-I${rIdx}` };
+
+            for (let c = 1; c <= 10; c++) {
+                let cell = wsM.getCell(rIdx, c); cell.fill = fill; cell.border = thinBorder;
+                cell.font = [1, 2, 3, 8].includes(c) ? boldFont : regularFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                if ([3, 5, 6, 7, 8].includes(c) && cell.value !== null) cell.numFmt = '#,##0';
+                if ([9, 10].includes(c)) { cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.numFmt = '0.0%'; }
+            }
+        });
+
+        let endRowM = startRowM + rekapMtqMarhalah.length - 1;
+        let sumRowM1 = endRowM + 1, sumRowM2 = endRowM + 2;
+
+        wsM.mergeCells(`A${sumRowM1}:B${sumRowM1}`); wsM.getCell(`A${sumRowM1}`).value = 'JUMLAH';
+        wsM.getCell(`C${sumRowM1}`).value = { formula: `SUM(C${startRowM}:C${endRowM})` };
+        wsM.getCell(`D${sumRowM1}`).value = hariAktif;
+        wsM.getCell(`E${sumRowM1}`).value = { formula: `SUM(E${startRowM}:E${endRowM})` };
+        wsM.getCell(`F${sumRowM1}`).value = { formula: `SUM(F${startRowM}:F${endRowM})` };
+        wsM.getCell(`G${sumRowM1}`).value = { formula: `SUM(G${startRowM}:G${endRowM})` };
+        wsM.getCell(`H${sumRowM1}`).value = { formula: `SUM(H${startRowM}:H${endRowM})` };
+        wsM.getCell(`I${sumRowM1}`).value = { formula: `H${sumRowM1}/(C${sumRowM1}*D${sumRowM1})` };
+        wsM.getCell(`J${sumRowM1}`).value = { formula: `1-I${sumRowM1}` };
+
+        for (let c = 1; c <= 10; c++) {
+            let cell = wsM.getCell(sumRowM1, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([9, 10].includes(c)) cell.numFmt = '0.0%'; else if (c >= 3) cell.numFmt = '#,##0';
+        }
+
+        wsM.mergeCells(`A${sumRowM2}:B${sumRowM2}`); wsM.getCell(`A${sumRowM2}`).value = 'Prosentase';
+        wsM.getCell(`C${sumRowM2}`).value = 1.0;
+        wsM.getCell(`E${sumRowM2}`).value = { formula: `E${sumRowM1}/(C${sumRowM1}*D${sumRowM1})` };
+        wsM.getCell(`F${sumRowM2}`).value = { formula: `F${sumRowM1}/(C${sumRowM1}*D${sumRowM1})` };
+        wsM.getCell(`G${sumRowM2}`).value = { formula: `G${sumRowM1}/(C${sumRowM1}*D${sumRowM1})` };
+        wsM.getCell(`H${sumRowM2}`).value = { formula: `H${sumRowM1}/(C${sumRowM1}*D${sumRowM1})` };
+        wsM.getCell(`I${sumRowM2}`).value = { formula: `I${sumRowM1}` };
+        wsM.getCell(`J${sumRowM2}`).value = { formula: `J${sumRowM1}` };
+
+        for (let c = 1; c <= 10; c++) {
+            let cell = wsM.getCell(sumRowM2, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([3, 5, 6, 7, 8, 9, 10].includes(c)) cell.numFmt = '0.0%';
+        }
+
+        wsM.columns = [{ width: 6 }, { width: 18 }, { width: 18 }, { width: 12 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 10 }, { width: 12 }, { width: 12 }];
+
+        saveWorkbook(wb, 'rekap_absensi_mutaallim_mtq_online.xlsx');
+    }
+
+    /* --- EXPORT EXCEL MQS (UNTOUCHED FORMULAS & STYLES) --- */
+    async function exportExcelMQS() {
+        if (rekapMqsDaerah.length === 0) return;
+        const wb = new ExcelJS.Workbook();
+        const hariAktif = parseInt(document.getElementById('customHariAktif').value) || 18;
+        const titleText = document.getElementById('titleHeaderMQS').value;
+
+        const greenFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92D050' } };
+        const blueFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } };
+        const whiteFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+
+        const headerFont = { name: 'Calibri', size: 11, bold: true };
+        const regularFont = { name: 'Calibri', size: 11, bold: false };
+        const boldFont = { name: 'Calibri', size: 11, bold: true };
+        const thinBorder = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+        // Sheet 1 MQS Daerah
+        const wsD = wb.addWorksheet('Rekap MQS Daerah');
+        wsD.views = [{ showGridLines: true }];
+        wsD.mergeCells('A1:J1'); wsD.getCell('A1').value = titleText;
+        wsD.getCell('A1').font = { name: 'Calibri', size: 14, bold: true };
+        wsD.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsD.mergeCells('A3:A4'); wsD.getCell('A3').value = 'NO';
+        wsD.mergeCells('B3:B4'); wsD.getCell('B3').value = 'DAERAH';
+        wsD.mergeCells('C3:C4'); wsD.getCell('C3').value = 'Jumlah Mutaallim';
+        wsD.mergeCells('D3:D4'); wsD.getCell('D3').value = 'Hari Aktif';
+        wsD.mergeCells('E3:G3'); wsD.getCell('E3').value = 'ABSEN MUTAALLIM';
+        wsD.mergeCells('H3:H4'); wsD.getCell('H3').value = 'Jumlah';
+        wsD.mergeCells('I3:J3'); wsD.getCell('I3').value = 'Prosentase';
+
+        wsD.getCell('E4').value = 'S'; wsD.getCell('F4').value = 'I'; wsD.getCell('G4').value = 'A';
+        wsD.getCell('I4').value = 'Absen'; wsD.getCell('J4').value = 'Hadir';
+
+        for (let r = 3; r <= 4; r++) {
+            for (let c = 1; c <= 10; c++) {
+                let cell = wsD.getCell(r, c); cell.fill = greenFill; cell.font = headerFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = thinBorder;
+            }
+        }
+
+        let startRowD = 5;
+        rekapMqsDaerah.forEach((row, idx) => {
+            let rIdx = startRowD + idx;
+            let fill = (idx % 2 === 1) ? blueFill : whiteFill;
+            wsD.getCell(rIdx, 1).value = idx + 1;
+            wsD.getCell(rIdx, 2).value = row.daerah;
+            wsD.getCell(rIdx, 3).value = row.jumlah;
+            wsD.getCell(rIdx, 4).value = hariAktif;
+            wsD.getCell(rIdx, 5).value = row.s || null;
+            wsD.getCell(rIdx, 6).value = row.i || null;
+            wsD.getCell(rIdx, 7).value = row.a || null;
+            wsD.getCell(rIdx, 8).value = { formula: `SUM(E${rIdx}:G${rIdx})` };
+            wsD.getCell(rIdx, 9).value = { formula: `H${rIdx}/(C${rIdx}*D${rIdx})` };
+            wsD.getCell(rIdx, 10).value = { formula: `1-I${rIdx}` };
+
+            for (let c = 1; c <= 10; c++) {
+                let cell = wsD.getCell(rIdx, c); cell.fill = fill; cell.border = thinBorder;
+                cell.font = [1, 2, 3, 8].includes(c) ? boldFont : regularFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                if ([3, 5, 6, 7, 8].includes(c) && cell.value !== null) cell.numFmt = '#,##0';
+                if ([9, 10].includes(c)) { cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.numFmt = '0.0%'; }
+            }
+        });
+
+        let endRowD = startRowD + rekapMqsDaerah.length - 1;
+        let sumRowD1 = endRowD + 1, sumRowD2 = endRowD + 2;
+
+        wsD.mergeCells(`A${sumRowD1}:B${sumRowD1}`); wsD.getCell(`A${sumRowD1}`).value = 'JUMLAH';
+        wsD.getCell(`C${sumRowD1}`).value = { formula: `SUM(C${startRowD}:C${endRowD})` };
+        wsD.getCell(`D${sumRowD1}`).value = hariAktif;
+        wsD.getCell(`E${sumRowD1}`).value = { formula: `SUM(E${startRowD}:E${endRowD})` };
+        wsD.getCell(`F${sumRowD1}`).value = { formula: `SUM(F${startRowD}:F${endRowD})` };
+        wsD.getCell(`G${sumRowD1}`).value = { formula: `SUM(G${startRowD}:G${endRowD})` };
+        wsD.getCell(`H${sumRowD1}`).value = { formula: `SUM(H${startRowD}:H${endRowD})` };
+        wsD.getCell(`I${sumRowD1}`).value = { formula: `H${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`J${sumRowD1}`).value = { formula: `1-I${sumRowD1}` };
+
+        for (let c = 1; c <= 10; c++) {
+            let cell = wsD.getCell(sumRowD1, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([9, 10].includes(c)) cell.numFmt = '0.0%'; else if (c >= 3) cell.numFmt = '#,##0';
+        }
+
+        wsD.mergeCells(`A${sumRowD2}:B${sumRowD2}`); wsD.getCell(`A${sumRowD2}`).value = 'Prosentase';
+        wsD.getCell(`C${sumRowD2}`).value = 1.0;
+        wsD.getCell(`E${sumRowD2}`).value = { formula: `E${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`F${sumRowD2}`).value = { formula: `F${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`G${sumRowD2}`).value = { formula: `G${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`H${sumRowD2}`).value = { formula: `H${sumRowD1}/(C${sumRowD1}*D${sumRowD1})` };
+        wsD.getCell(`I${sumRowD2}`).value = { formula: `I${sumRowD1}` };
+        wsD.getCell(`J${sumRowD2}`).value = { formula: `J${sumRowD1}` };
+
+        for (let c = 1; c <= 10; c++) {
+            let cell = wsD.getCell(sumRowD2, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([3, 5, 6, 7, 8, 9, 10].includes(c)) cell.numFmt = '0.0%';
+        }
+
+        wsD.columns = [{ width: 6 }, { width: 14 }, { width: 18 }, { width: 12 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 10 }, { width: 12 }, { width: 12 }];
+
+        // Sheet 2 MQS Jilid
+        const wsJ = wb.addWorksheet('Rekap MQS Jilid');
+        wsJ.views = [{ showGridLines: true }];
+        wsJ.mergeCells('A1:J1'); wsJ.getCell('A1').value = titleText;
+        wsJ.getCell('A1').font = { name: 'Calibri', size: 14, bold: true };
+        wsJ.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsJ.mergeCells('A3:A4'); wsJ.getCell('A3').value = 'No';
+        wsJ.mergeCells('B3:B4'); wsJ.getCell('B3').value = 'Kategori';
+        wsJ.mergeCells('C3:C4'); wsJ.getCell('C3').value = 'Jumlah Mutaallim';
+        wsJ.mergeCells('D3:D4'); wsJ.getCell('D3').value = 'Hari Aktif';
+        wsJ.mergeCells('E3:G3'); wsJ.getCell('E3').value = 'ABSEN MUTAALLIM';
+        wsJ.mergeCells('H3:H4'); wsJ.getCell('H3').value = 'Jumlah';
+        wsJ.mergeCells('I3:J3'); wsJ.getCell('I3').value = 'Prosentase';
+
+        wsJ.getCell('E4').value = 'S'; wsJ.getCell('F4').value = 'I'; wsJ.getCell('G4').value = 'A';
+        wsJ.getCell('I4').value = 'Absen'; wsJ.getCell('J4').value = 'Hadir';
+
+        for (let r = 3; r <= 4; r++) {
+            for (let c = 1; c <= 10; c++) {
+                let cell = wsJ.getCell(r, c); cell.fill = greenFill; cell.font = headerFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = thinBorder;
+            }
+        }
+
+        let startRowJ = 5;
+        rekapMqsJilid.forEach((row, idx) => {
+            let rIdx = startRowJ + idx;
+            let fill = (idx % 2 === 1) ? blueFill : whiteFill;
+            wsJ.getCell(rIdx, 1).value = idx + 1;
+            wsJ.getCell(rIdx, 2).value = row.jilid;
+            wsJ.getCell(rIdx, 3).value = row.jumlah;
+            wsJ.getCell(rIdx, 4).value = hariAktif;
+            wsJ.getCell(rIdx, 5).value = row.s || null;
+            wsJ.getCell(rIdx, 6).value = row.i || null;
+            wsJ.getCell(rIdx, 7).value = row.a || null;
+            wsJ.getCell(rIdx, 8).value = { formula: `SUM(E${rIdx}:G${rIdx})` };
+            wsJ.getCell(rIdx, 9).value = { formula: `H${rIdx}/(C${rIdx}*D${rIdx})` };
+            wsJ.getCell(rIdx, 10).value = { formula: `1-I${rIdx}` };
+
+            for (let c = 1; c <= 10; c++) {
+                let cell = wsJ.getCell(rIdx, c); cell.fill = fill; cell.border = thinBorder;
+                cell.font = [1, 2, 3, 8].includes(c) ? boldFont : regularFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                if ([3, 5, 6, 7, 8].includes(c) && cell.value !== null) cell.numFmt = '#,##0';
+                if ([9, 10].includes(c)) { cell.alignment = { horizontal: 'right', vertical: 'middle' }; cell.numFmt = '0.0%'; }
+            }
+        });
+
+        let endRowJ = startRowJ + rekapMqsJilid.length - 1;
+        let sumRowJ1 = endRowJ + 1, sumRowJ2 = endRowJ + 2;
+
+        wsJ.mergeCells(`A${sumRowJ1}:B${sumRowJ1}`); wsJ.getCell(`A${sumRowJ1}`).value = 'JUMLAH / TOTAL';
+        wsJ.getCell(`C${sumRowJ1}`).value = { formula: `SUM(C${startRowJ}:C${endRowJ})` };
+        wsJ.getCell(`D${sumRowJ1}`).value = hariAktif;
+        wsJ.getCell(`E${sumRowJ1}`).value = { formula: `SUM(E${startRowJ}:E${endRowJ})` };
+        wsJ.getCell(`F${sumRowJ1}`).value = { formula: `SUM(F${startRowJ}:F${endRowJ})` };
+        wsJ.getCell(`G${sumRowJ1}`).value = { formula: `SUM(G${startRowJ}:G${endRowJ})` };
+        wsJ.getCell(`H${sumRowJ1}`).value = { formula: `SUM(H${startRowJ}:H${endRowJ})` };
+        wsJ.getCell(`I${sumRowJ1}`).value = { formula: `H${sumRowJ1}/(C${sumRowJ1}*D${sumRowJ1})` };
+        wsJ.getCell(`J${sumRowJ1}`).value = { formula: `1-I${sumRowJ1}` };
+
+        for (let c = 1; c <= 10; c++) {
+            let cell = wsJ.getCell(sumRowJ1, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([9, 10].includes(c)) cell.numFmt = '0.0%'; else if (c >= 3) cell.numFmt = '#,##0';
+        }
+
+        wsJ.mergeCells(`A${sumRowJ2}:B${sumRowJ2}`); wsJ.getCell(`A${sumRowJ2}`).value = 'Prosentase';
+        wsJ.getCell(`C${sumRowJ2}`).value = 1.0;
+        wsJ.getCell(`E${sumRowJ2}`).value = { formula: `E${sumRowJ1}/(C${sumRowJ1}*D${sumRowJ1})` };
+        wsJ.getCell(`F${sumRowJ2}`).value = { formula: `F${sumRowJ1}/(C${sumRowJ1}*D${sumRowJ1})` };
+        wsJ.getCell(`G${sumRowJ2}`).value = { formula: `G${sumRowJ1}/(C${sumRowJ1}*D${sumRowJ1})` };
+        wsJ.getCell(`H${sumRowJ2}`).value = { formula: `H${sumRowJ1}/(C${sumRowJ1}*D${sumRowJ1})` };
+        wsJ.getCell(`I${sumRowJ2}`).value = { formula: `I${sumRowJ1}` };
+        wsJ.getCell(`J${sumRowJ2}`).value = { formula: `J${sumRowJ1}` };
+
+        for (let c = 1; c <= 10; c++) {
+            let cell = wsJ.getCell(sumRowJ2, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+            cell.alignment = c >= 9 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+            if ([3, 5, 6, 7, 8, 9, 10].includes(c)) cell.numFmt = '0.0%';
+        }
+
+        wsJ.columns = [{ width: 6 }, { width: 16 }, { width: 18 }, { width: 12 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 10 }, { width: 12 }, { width: 12 }];
+
+        saveWorkbook(wb, 'rekap_absensi_mutaallim_mqs_online.xlsx');
+    }
+
+    async function saveWorkbook(wb, filename) {
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>
