@@ -638,7 +638,7 @@
 <div class="container">
     <header>
         <h1>📖 Rekap Presisi Absensi Online (MTQ & MQS)</h1>
-        <p class="subtitle">Otomatis Mengambil & Mengolah Data dari Spreadsheet Master & Database Rekap Taklimda</p>
+        <p class="subtitle">Otomatis Mengambil & Mengolah Data dari Spreadsheet Master & Database Rekap Taklimda (Khusus Daerah A-Z)</p>
     </header>
 
     <!-- Action Bar -->
@@ -721,6 +721,7 @@
 
     // Global Stores
     let masterDomisiliMap = new Map();
+    let masterNamaMap = new Map();
     let dbSantriMtqMap = new Map();
     let dbSantriMqsMap = new Map();
     let rawTaklimdaList = []; 
@@ -762,26 +763,44 @@
         return str;
     }
 
-    function extractDaerahMTQ(domisiliStr) {
-        if (!domisiliStr || domisiliStr === '-') return 'LAIN';
+    /* Fungsi Ekstraksi Ketat Khusus Daerah A-Z */
+    function extractDaerahLetter(domisiliStr) {
+        if (!domisiliStr || domisiliStr === '-') return null;
         let clean = domisiliStr.trim().toUpperCase();
-        let match = clean.match(/^([A-Z])[\s\-0-9]/);
-        if (match) return match[1];
-        if (clean.length === 1 && /[A-Z]/.test(clean)) return clean;
-        let match2 = clean.match(/^([A-Z])/);
-        if (match2 && "ABCDEFGHIJKLMNOPQRSTZ".includes(match2[1])) return match2[1];
-        return 'LAIN';
+
+        const excludedKeywords = [
+            'RUMAH', 'ORANG TUA', 'ORANGTUA', 'FAMILY', 'FAMILI', 
+            'DALEM', 'LAIN', 'PENGABDIAN', 'TIDAK', 'LUAR', 'NAGARI', 
+            'KOST', 'HOTEL', 'ALUMNI', 'SWASTA'
+        ];
+
+        for (let kw of excludedKeywords) {
+            if (clean.includes(kw)) return null;
+        }
+
+        if (clean.startsWith('DAERAH')) {
+            clean = clean.replace(/^DAERAH\s*/, '').trim();
+        }
+
+        let match = clean.match(/^([A-Z])([\s\.\-0-9]|$)/);
+        if (match) {
+            let letter = match[1];
+            if ("ABCDEFGHIJKLMNOPQRSTZ".includes(letter)) {
+                return letter;
+            }
+        }
+
+        return null;
+    }
+
+    function extractDaerahMTQ(domisiliStr) {
+        let letter = extractDaerahLetter(domisiliStr);
+        return letter ? letter : 'LAIN';
     }
 
     function extractDaerahMQS(domisiliStr) {
-        if (!domisiliStr || domisiliStr === '-') return 'LAIN';
-        let clean = domisiliStr.trim().toUpperCase();
-        let match = clean.match(/^([A-Z])[\s\-0-9]/);
-        if (match) return 'DAERAH ' + match[1];
-        if (clean.length === 1 && /[A-Z]/.test(clean)) return 'DAERAH ' + clean;
-        let match2 = clean.match(/^([A-Z])/);
-        if (match2 && "ABCDEFGHIJKLMNOPQRSTZ".includes(match2[1])) return 'DAERAH ' + match2[1];
-        return 'LAIN';
+        let letter = extractDaerahLetter(domisiliStr);
+        return letter ? ('DAERAH ' + letter) : 'LAIN';
     }
 
     function normalizeMarhalahMTQ(raw) {
@@ -812,7 +831,6 @@
         return 'Jilid 1';
     }
 
-    // Pembantu penarikan data aman dengan sistem RETRY jika Google Apps Script memberikan HTML
     async function fetchJsonSafe(url, retries = 3, delayMs = 1000) {
         for (let i = 0; i < retries; i++) {
             try {
@@ -831,7 +849,6 @@
         }
     }
 
-    // Penarikan data sekuensial (bergantian) agar server Google Apps Script tidak kolaps
     async function fetchDataOnline() {
         document.getElementById('loadingOverlay').classList.add('active');
         document.getElementById('btnSync').disabled = true;
@@ -876,6 +893,7 @@
 
     function parseMasterData(res) {
         masterDomisiliMap.clear();
+        masterNamaMap.clear();
         dbSantriMtqMap.clear();
         dbSantriMqsMap.clear();
 
@@ -883,42 +901,54 @@
         const dataUtama = res.dataUtama || [];
 
         let idxId = headersUtama.findIndex(h => String(h).toUpperCase().includes('ID'));
+        let idxNama = headersUtama.findIndex(h => String(h).toUpperCase().includes('NAMA'));
         let idxDom = headersUtama.findIndex(h => String(h).toUpperCase().includes('DOMISILI') && !String(h).toUpperCase().includes('STATUS'));
         
         if (idxId === -1) idxId = 0;
+        if (idxNama === -1) idxNama = 1;
         if (idxDom === -1) idxDom = 6;
 
         dataUtama.forEach(row => {
             let id = cleanId(row[idxId]);
+            let nama = String(row[idxNama] || '').trim();
             let dom = String(row[idxDom] || '').trim();
-            if (id) masterDomisiliMap.set(id, dom);
+            if (id) {
+                masterDomisiliMap.set(id, dom);
+                if (nama) masterNamaMap.set(id, nama);
+            }
         });
 
         const mutaallimMap = res.mutaallimMap || {};
         for (let rawId in mutaallimMap) {
             let id = cleanId(rawId);
             let item = mutaallimMap[rawId];
+            let nama = String(item["NAMA"] || item["NAMA LENGKAP"] || item["NAMA MUTAALLIM"] || item["NAMA SANTRI"] || masterNamaMap.get(id) || '').trim();
             let kategori = String(item["KATEGORI BARU"] || item["KATEGORI"] || '').toUpperCase();
             let rawMarhalah = String(item["JILID/MARHALAH BARU"] || item["JILID/MARHALAH"] || item["JILID BARU"] || item["MARHALAH BARU"] || item["JILID"] || item["MARHALAH"] || '').trim();
 
             let dom = masterDomisiliMap.get(id) || '-';
+            let letter = extractDaerahLetter(dom);
 
-            if (kategori.includes('MTQ') || (!kategori && rawMarhalah)) {
-                dbSantriMtqMap.set(id, {
-                    id: id,
-                    domisili: dom,
-                    daerah: extractDaerahMTQ(dom),
-                    marhalah: normalizeMarhalahMTQ(rawMarhalah)
-                });
-            }
+            if (letter) {
+                if (kategori.includes('MTQ') || (!kategori && rawMarhalah)) {
+                    dbSantriMtqMap.set(id, {
+                        id: id,
+                        nama: nama,
+                        domisili: dom,
+                        daerah: letter,
+                        marhalah: normalizeMarhalahMTQ(rawMarhalah)
+                    });
+                }
 
-            if (kategori.includes('MQS')) {
-                dbSantriMqsMap.set(id, {
-                    id: id,
-                    domisili: dom,
-                    daerah: extractDaerahMQS(dom),
-                    jilid: normalizeJilidMQS(rawMarhalah)
-                });
+                if (kategori.includes('MQS')) {
+                    dbSantriMqsMap.set(id, {
+                        id: id,
+                        nama: nama,
+                        domisili: dom,
+                        daerah: 'DAERAH ' + letter,
+                        jilid: normalizeJilidMQS(rawMarhalah)
+                    });
+                }
             }
         }
     }
@@ -970,7 +1000,6 @@
         recalculateAndRenderAll();
     }
 
-    /* REVISI LOGIKA: Menghitung HEADCOUNT / JUMLAH SANTRI yang Sakit/Izin/Alpa, BUKAN total frekuensinya */
     function parseTaklimdaDataFiltered(filterBulan, filterTahun) {
         absenDataMtqMap.clear();
         absenDataMqsMap.clear();
@@ -985,38 +1014,45 @@
             if (filterTahun !== 'ALL' && rowTahun.toLowerCase() !== filterTahun.toLowerCase()) return;
 
             let id = cleanId(row.idpps || row.id);
-            let valS = parseInt(row.totalsakit) || 0;
-            let valI = parseInt(row.totalizin) || 0;
-            let valA = parseInt(row.totalalpa || row.totalalpha) || 0;
-
-            let kategori = String(row.kategori || '').toUpperCase();
-            let dom = String(row.domisili || '').trim();
-            let rawMarhalah = String(row.marhalahjilid || row.marhalah || row.jilid || '').trim();
-
             if (!id) return;
 
+            let valS = parseInt(row.totalsakit || row.sakit) || 0;
+            let valI = parseInt(row.totalizin || row.izin) || 0;
+            let valA = parseInt(row.totalalpa || row.totalalpha || row.alpa) || 0;
+
+            let kategori = String(row.kategori || '').toUpperCase();
+            let dom = String(row.domisili || row.dom || '').trim();
+            let rawMarhalah = String(row.marhalahjilid || row.marhalah || row.jilid || '').trim();
+
             if (dbSantriMtqMap.has(id) || kategori.includes('MTQ')) {
-                if (!absenDataMtqMap.has(id)) {
-                    absenDataMtqMap.set(id, { id, dom, marhalah: rawMarhalah, rawS: 0, rawI: 0, rawA: 0 });
+                let santri = dbSantriMtqMap.get(id);
+                let checkDom = santri ? santri.domisili : dom;
+                if (extractDaerahLetter(checkDom)) {
+                    if (!absenDataMtqMap.has(id)) {
+                        absenDataMtqMap.set(id, { id, dom: checkDom, marhalah: rawMarhalah, rawS: 0, rawI: 0, rawA: 0 });
+                    }
+                    let rec = absenDataMtqMap.get(id);
+                    rec.rawS += valS;
+                    rec.rawI += valI;
+                    rec.rawA += valA;
                 }
-                let rec = absenDataMtqMap.get(id);
-                rec.rawS += valS;
-                rec.rawI += valI;
-                rec.rawA += valA;
             }
 
             if (dbSantriMqsMap.has(id) || kategori.includes('MQS')) {
-                if (!absenDataMqsMap.has(id)) {
-                    absenDataMqsMap.set(id, { id, dom, jilid: rawMarhalah, rawS: 0, rawI: 0, rawA: 0 });
+                let santri = dbSantriMqsMap.get(id);
+                let checkDom = santri ? santri.domisili : dom;
+                if (extractDaerahLetter(checkDom)) {
+                    if (!absenDataMqsMap.has(id)) {
+                        absenDataMqsMap.set(id, { id, dom: checkDom, jilid: rawMarhalah, rawS: 0, rawI: 0, rawA: 0 });
+                    }
+                    let rec = absenDataMqsMap.get(id);
+                    rec.rawS += valS;
+                    rec.rawI += valI;
+                    rec.rawA += valA;
                 }
-                let rec = absenDataMqsMap.get(id);
-                rec.rawS += valS;
-                rec.rawI += valI;
-                rec.rawA += valA;
             }
         });
 
-        // Konversi totalsakit/totalizin/totalalpa ke headcount santri (1 jika > 0, 0 jika tidak ada)
         absenDataMtqMap.forEach(rec => {
             rec.s = rec.rawS > 0 ? 1 : 0;
             rec.i = rec.rawI > 0 ? 1 : 0;
@@ -1047,8 +1083,7 @@
 
         dbSantriMtqMap.forEach(santri => {
             let dObj = daerahMtqMap.get(santri.daerah);
-            if (!dObj) { dObj = { daerah: santri.daerah, jumlah: 0, s: 0, i: 0, a: 0 }; daerahMtqMap.set(santri.daerah, dObj); }
-            dObj.jumlah++;
+            if (dObj) dObj.jumlah++;
 
             let mObj = marhalahMtqMap.get(santri.marhalah);
             if (!mObj) { mObj = { marhalah: santri.marhalah, jumlah: 0, s: 0, i: 0, a: 0 }; marhalahMtqMap.set(santri.marhalah, mObj); }
@@ -1109,8 +1144,7 @@
             let jilid = santri ? santri.jilid : normalizeJilidMQS(absen.jilid);
 
             let dObj = daerahMqsMap.get(daerah);
-            if (!dObj) { dObj = { daerah: daerah, jumlah: 0, s: 0, i: 0, a: 0 }; daerahMqsMap.set(daerah, dObj); }
-            dObj.s += absen.s; dObj.i += absen.i; dObj.a += absen.a;
+            if (dObj) { dObj.s += absen.s; dObj.i += absen.i; dObj.a += absen.a; }
 
             let jObj = jilidMqsMap.get(jilid);
             if (jObj) { jObj.s += absen.s; jObj.i += absen.i; jObj.a += absen.a; }
@@ -1291,7 +1325,6 @@
             </table></div>`;
     }
 
-    /* Interactive Sub Tab Click Trigger for Modal Bounce Preview */
     function openSubTabModal(tabId, tabTitle) {
         if (!isDataLoaded) {
             showIosToast("Data online belum dimuat! Silakan klik Ambil & Olah Data Online dulu.", true);
@@ -1325,7 +1358,97 @@
         document.getElementById('groupTitleMQS').style.display = mode === 'MQS' ? 'flex' : 'none';
     }
 
-    /* --- EXPORT EXCEL MTQ (UNTOUCHED FORMULAS & STYLES) --- */
+    /* FIX: Ekstraksi Properti Keterangan Taklimda & Tanggal Absen Lengkap */
+    function getDetailAbsenList(mode) {
+        const filterBulan = document.getElementById('selectBulan').value;
+        const filterTahun = document.getElementById('selectTahun').value;
+        let list = [];
+
+        rawTaklimdaList.forEach(row => {
+            if (row._source && row._source !== 'database') return;
+
+            let rowBulan = String(row.bulanhijriah || row.bulan || '').trim();
+            let rowTahun = String(row.tahunhijriah || row.tahun || '').trim();
+
+            if (filterBulan !== 'ALL' && rowBulan.toLowerCase() !== filterBulan.toLowerCase()) return;
+            if (filterTahun !== 'ALL' && rowTahun.toLowerCase() !== filterTahun.toLowerCase()) return;
+
+            let id = cleanId(row.idpps || row.id);
+            if (!id) return;
+
+            let kategori = String(row.kategori || '').toUpperCase();
+            let isMtq = mode === 'MTQ' && (dbSantriMtqMap.has(id) || kategori.includes('MTQ'));
+            let isMqs = mode === 'MQS' && (dbSantriMqsMap.has(id) || kategori.includes('MQS'));
+
+            if (!isMtq && !isMqs) return;
+
+            let santri = mode === 'MTQ' ? dbSantriMtqMap.get(id) : dbSantriMqsMap.get(id);
+            let dom = (santri ? santri.domisili : String(row.domisili || row.dom || '')).trim();
+
+            if (!extractDaerahLetter(dom)) return;
+
+            let nama = (santri ? santri.nama : '') || String(row.nama || row.namamutaallim || row.namasantri || '').trim();
+            let marhalahJilid = santri 
+                ? (mode === 'MTQ' ? santri.marhalah : santri.jilid)
+                : (mode === 'MTQ' ? normalizeMarhalahMTQ(row.marhalahjilid || row.marhalah) : normalizeJilidMQS(row.marhalahjilid || row.jilid));
+            
+            let jalsah = String(row.jalsah || row.sesi || '-').trim();
+            let valS = parseInt(row.totalsakit || row.sakit) || 0;
+            let valI = parseInt(row.totalizin || row.izin) || 0;
+            let valA = parseInt(row.totalalpa || row.totalalpha || row.alpa) || 0;
+
+            // Membaca Variabel Tanggal dari Spreadsheet
+            let tglS = String(row["Tanggal Sakit"] || row.tanggalsakit || row.tglsakit || row.tgl_sakit || '').trim();
+            let tglI = String(row["Tanggal Izin"] || row.tanggalizin || row.tglizin || row.tgl_izin || '').trim();
+            let tglA = String(row["Tanggal Alpa"] || row.tanggalalpa || row.tglalpa || row.tgl_alpa || '').trim();
+
+            // FIX: Pengecekan Lengkap untuk Kolom "Keterangan Taklimda"
+            let ket = String(
+                row["Keterangan Taklimda"] || 
+                row["KETERANGAN TAKLIMDA"] || 
+                row.keterangantaklimda || 
+                row.keterangan_taklimda || 
+                row.keterangan || 
+                row.ket || ''
+            ).trim();
+
+            list.push({
+                id,
+                nama,
+                domisili: dom,
+                marhalah: marhalahJilid,
+                jalsah,
+                valS,
+                valI,
+                valA,
+                tglS,
+                tglI,
+                tglA,
+                ket
+            });
+        });
+
+        /* SORTING:
+           1. Dahulukan yang ada Alpanya (valA > 0)
+           2. Dahulukan yang ada Keterangan Taklimda
+           3. Urutkan Nama
+        */
+        list.sort((a, b) => {
+            let aHasAlpa = a.valA > 0 ? 1 : 0;
+            let bHasAlpa = b.valA > 0 ? 1 : 0;
+            if (aHasAlpa !== bHasAlpa) return bHasAlpa - aHasAlpa;
+
+            let aHasKet = (a.ket && a.ket !== '-' && a.ket !== 'undefined') ? 1 : 0;
+            let bHasKet = (b.ket && b.ket !== '-' && b.ket !== 'undefined') ? 1 : 0;
+            if (aHasKet !== bHasKet) return bHasKet - aHasKet;
+
+            return a.nama.localeCompare(b.nama);
+        });
+
+        return list;
+    }
+
+    /* --- EXPORT EXCEL MTQ --- */
     async function exportExcelMTQ() {
         if (rekapMtqDaerah.length === 0) return;
         const wb = new ExcelJS.Workbook();
@@ -1512,10 +1635,83 @@
 
         wsM.columns = [{ width: 6 }, { width: 18 }, { width: 18 }, { width: 12 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 10 }, { width: 12 }, { width: 12 }];
 
+        // Sheet 3 - Detail Rekap Absen MTQ
+        const wsDetail = wb.addWorksheet('Detail Rekap Absen');
+        wsDetail.views = [{ showGridLines: true }];
+
+        wsDetail.mergeCells('A1:M1');
+        wsDetail.getCell('A1').value = titleText + " (DETAIL REKAP ABSENSI)";
+        wsDetail.getCell('A1').font = { name: 'Calibri', size: 14, bold: true };
+        wsDetail.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsDetail.mergeCells('A3:A4'); wsDetail.getCell('A3').value = 'No';
+        wsDetail.mergeCells('B3:B4'); wsDetail.getCell('B3').value = 'ID PPS';
+        wsDetail.mergeCells('C3:C4'); wsDetail.getCell('C3').value = 'Nama';
+        wsDetail.mergeCells('D3:D4'); wsDetail.getCell('D3').value = 'Domisili';
+        wsDetail.mergeCells('E3:E4'); wsDetail.getCell('E3').value = 'Marhalah';
+        wsDetail.mergeCells('F3:F4'); wsDetail.getCell('F3').value = 'Jalsah';
+        wsDetail.mergeCells('G3:I3'); wsDetail.getCell('G3').value = 'JUMLAH ABSEN';
+        wsDetail.getCell('G4').value = 'S'; wsDetail.getCell('H4').value = 'I'; wsDetail.getCell('I4').value = 'A';
+        wsDetail.mergeCells('J3:L3'); wsDetail.getCell('J3').value = 'TANGGAL ABSEN';
+        wsDetail.getCell('J4').value = 'Tgl Sakit'; wsDetail.getCell('K4').value = 'Tgl Izin'; wsDetail.getCell('L4').value = 'Tgl Alpa';
+        wsDetail.mergeCells('M3:M4'); wsDetail.getCell('M3').value = 'Keterangan';
+
+        for (let r = 3; r <= 4; r++) {
+            for (let c = 1; c <= 13; c++) {
+                let cell = wsDetail.getCell(r, c); cell.fill = greenFill; cell.font = headerFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = thinBorder;
+            }
+        }
+
+        let detailList = getDetailAbsenList('MTQ');
+        let startRowDet = 5;
+        detailList.forEach((row, idx) => {
+            let rIdx = startRowDet + idx;
+            let fill = (idx % 2 === 1) ? blueFill : whiteFill;
+
+            wsDetail.getCell(rIdx, 1).value = idx + 1;
+            wsDetail.getCell(rIdx, 2).value = row.id;
+            wsDetail.getCell(rIdx, 3).value = row.nama;
+            wsDetail.getCell(rIdx, 4).value = row.domisili;
+            wsDetail.getCell(rIdx, 5).value = row.marhalah;
+            wsDetail.getCell(rIdx, 6).value = row.jalsah;
+            wsDetail.getCell(rIdx, 7).value = row.valS || null;
+            wsDetail.getCell(rIdx, 8).value = row.valI || null;
+            wsDetail.getCell(rIdx, 9).value = row.valA || null;
+            wsDetail.getCell(rIdx, 10).value = row.tglS || '';
+            wsDetail.getCell(rIdx, 11).value = row.tglI || '';
+            wsDetail.getCell(rIdx, 12).value = row.tglA || '';
+            wsDetail.getCell(rIdx, 13).value = row.ket || '';
+
+            for (let c = 1; c <= 13; c++) {
+                let cell = wsDetail.getCell(rIdx, c); cell.fill = fill; cell.border = thinBorder;
+                cell.font = [1, 2, 7, 8, 9].includes(c) ? boldFont : regularFont;
+                cell.alignment = [3, 13].includes(c) ? { horizontal: 'left', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+                if ([7, 8, 9].includes(c) && cell.value !== null) cell.numFmt = '#,##0';
+            }
+        });
+
+        let endRowDet = startRowDet + detailList.length - 1;
+        if (detailList.length > 0) {
+            let sumRowDet = endRowDet + 1;
+            wsDetail.mergeCells(`A${sumRowDet}:F${sumRowDet}`); wsDetail.getCell(`A${sumRowDet}`).value = 'JUMLAH TOTAL';
+            wsDetail.getCell(`G${sumRowDet}`).value = { formula: `SUM(G${startRowDet}:G${endRowDet})` };
+            wsDetail.getCell(`H${sumRowDet}`).value = { formula: `SUM(H${startRowDet}:H${endRowDet})` };
+            wsDetail.getCell(`I${sumRowDet}`).value = { formula: `SUM(I${startRowDet}:I${endRowDet})` };
+
+            for (let c = 1; c <= 13; c++) {
+                let cell = wsDetail.getCell(sumRowDet, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                if ([7, 8, 9].includes(c)) cell.numFmt = '#,##0';
+            }
+        }
+
+        wsDetail.columns = [{ width: 6 }, { width: 12 }, { width: 25 }, { width: 15 }, { width: 15 }, { width: 10 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 30 }];
+
         saveWorkbook(wb, 'rekap_absensi_mutaallim_mtq_online.xlsx');
     }
 
-    /* --- EXPORT EXCEL MQS (UNTOUCHED FORMULAS & STYLES) --- */
+    /* --- EXPORT EXCEL MQS --- */
     async function exportExcelMQS() {
         if (rekapMqsDaerah.length === 0) return;
         const wb = new ExcelJS.Workbook();
@@ -1700,6 +1896,79 @@
         }
 
         wsJ.columns = [{ width: 6 }, { width: 16 }, { width: 18 }, { width: 12 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 10 }, { width: 12 }, { width: 12 }];
+
+        // Sheet 3 - Detail Rekap Absen MQS
+        const wsDetail = wb.addWorksheet('Detail Rekap Absen');
+        wsDetail.views = [{ showGridLines: true }];
+
+        wsDetail.mergeCells('A1:M1');
+        wsDetail.getCell('A1').value = titleText + " (DETAIL REKAP ABSENSI)";
+        wsDetail.getCell('A1').font = { name: 'Calibri', size: 14, bold: true };
+        wsDetail.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+
+        wsDetail.mergeCells('A3:A4'); wsDetail.getCell('A3').value = 'No';
+        wsDetail.mergeCells('B3:B4'); wsDetail.getCell('B3').value = 'ID PPS';
+        wsDetail.mergeCells('C3:C4'); wsDetail.getCell('C3').value = 'Nama';
+        wsDetail.mergeCells('D3:D4'); wsDetail.getCell('D3').value = 'Domisili';
+        wsDetail.mergeCells('E3:E4'); wsDetail.getCell('E3').value = 'Jilid/Kategori';
+        wsDetail.mergeCells('F3:F4'); wsDetail.getCell('F3').value = 'Jalsah';
+        wsDetail.mergeCells('G3:I3'); wsDetail.getCell('G3').value = 'JUMLAH ABSEN';
+        wsDetail.getCell('G4').value = 'S'; wsDetail.getCell('H4').value = 'I'; wsDetail.getCell('I4').value = 'A';
+        wsDetail.mergeCells('J3:L3'); wsDetail.getCell('J3').value = 'TANGGAL ABSEN';
+        wsDetail.getCell('J4').value = 'Tgl Sakit'; wsDetail.getCell('K4').value = 'Tgl Izin'; wsDetail.getCell('L4').value = 'Tgl Alpa';
+        wsDetail.mergeCells('M3:M4'); wsDetail.getCell('M3').value = 'Keterangan';
+
+        for (let r = 3; r <= 4; r++) {
+            for (let c = 1; c <= 13; c++) {
+                let cell = wsDetail.getCell(r, c); cell.fill = greenFill; cell.font = headerFont;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = thinBorder;
+            }
+        }
+
+        let detailList = getDetailAbsenList('MQS');
+        let startRowDet = 5;
+        detailList.forEach((row, idx) => {
+            let rIdx = startRowDet + idx;
+            let fill = (idx % 2 === 1) ? blueFill : whiteFill;
+
+            wsDetail.getCell(rIdx, 1).value = idx + 1;
+            wsDetail.getCell(rIdx, 2).value = row.id;
+            wsDetail.getCell(rIdx, 3).value = row.nama;
+            wsDetail.getCell(rIdx, 4).value = row.domisili;
+            wsDetail.getCell(rIdx, 5).value = row.marhalah;
+            wsDetail.getCell(rIdx, 6).value = row.jalsah;
+            wsDetail.getCell(rIdx, 7).value = row.valS || null;
+            wsDetail.getCell(rIdx, 8).value = row.valI || null;
+            wsDetail.getCell(rIdx, 9).value = row.valA || null;
+            wsDetail.getCell(rIdx, 10).value = row.tglS || '';
+            wsDetail.getCell(rIdx, 11).value = row.tglI || '';
+            wsDetail.getCell(rIdx, 12).value = row.tglA || '';
+            wsDetail.getCell(rIdx, 13).value = row.ket || '';
+
+            for (let c = 1; c <= 13; c++) {
+                let cell = wsDetail.getCell(rIdx, c); cell.fill = fill; cell.border = thinBorder;
+                cell.font = [1, 2, 7, 8, 9].includes(c) ? boldFont : regularFont;
+                cell.alignment = [3, 13].includes(c) ? { horizontal: 'left', vertical: 'middle' } : { horizontal: 'center', vertical: 'middle' };
+                if ([7, 8, 9].includes(c) && cell.value !== null) cell.numFmt = '#,##0';
+            }
+        });
+
+        let endRowDet = startRowDet + detailList.length - 1;
+        if (detailList.length > 0) {
+            let sumRowDet = endRowDet + 1;
+            wsDetail.mergeCells(`A${sumRowDet}:F${sumRowDet}`); wsDetail.getCell(`A${sumRowDet}`).value = 'JUMLAH TOTAL';
+            wsDetail.getCell(`G${sumRowDet}`).value = { formula: `SUM(G${startRowDet}:G${endRowDet})` };
+            wsDetail.getCell(`H${sumRowDet}`).value = { formula: `SUM(H${startRowDet}:H${endRowDet})` };
+            wsDetail.getCell(`I${sumRowDet}`).value = { formula: `SUM(I${startRowDet}:I${endRowDet})` };
+
+            for (let c = 1; c <= 13; c++) {
+                let cell = wsDetail.getCell(sumRowDet, c); cell.fill = greenFill; cell.font = boldFont; cell.border = thinBorder;
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                if ([7, 8, 9].includes(c)) cell.numFmt = '#,##0';
+            }
+        }
+
+        wsDetail.columns = [{ width: 6 }, { width: 12 }, { width: 25 }, { width: 15 }, { width: 15 }, { width: 10 }, { width: 8 }, { width: 8 }, { width: 8 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 30 }];
 
         saveWorkbook(wb, 'rekap_absensi_mutaallim_mqs_online.xlsx');
     }
