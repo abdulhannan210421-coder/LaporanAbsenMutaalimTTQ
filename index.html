@@ -718,6 +718,9 @@
 <script>
     const URL_MASTER = "https://script.google.com/macros/s/AKfycbzV_l5rAXgnapi2c3ZH90WOusrHgN-Ny9wjaFJ9tczCl1mkz1pURw_sZUYhEF4YY6byRg/exec";
     const URL_TAKLIMDA = "https://script.google.com/macros/s/AKfycbz1ecMJ8KBdbsNhuJCm_eYrRH2ATxZH7sn73GV-B19JoxKLNMrS8BCS8fZNnHBcqjM/exec";
+    
+    // Kunci Rahasia untuk Enkripsi Payload (Samakan dengan Kode.gs)
+    const SECRET_KEY = "SidogiriSantriSecretKey2026";
 
     // Global Stores
     let masterDomisiliMap = new Map();
@@ -930,16 +933,38 @@
         }
     }
 
-    // Mengambil data secara Paralel (Promise.all) agar 2x lebih cepat
+    // FUNGSI DEKRIPSI PAYLOAD TERENKRIPSI (Kompatibel dengan encryptPayload Kode.gs)
+    function decryptPayload(base64Str, key) {
+        try {
+            const encryptedStr = atob(base64Str);
+            let decodedStr = "";
+            for (let i = 0; i < encryptedStr.length; i++) {
+                decodedStr += String.fromCharCode(encryptedStr.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            return JSON.parse(decodeURIComponent(decodedStr));
+        } catch (e) {
+            console.error("Gagal dekripsi payload:", e);
+            throw new Error("Gagal mendekripsi payload terenkripsi dari server.");
+        }
+    }
+
+    // Mengambil data secara Paralel (Promise.all) + Memakai Enkripsi Sesuai Kode.gs
     async function fetchDataOnline() {
         document.getElementById('loadingOverlay').classList.add('active');
         document.getElementById('btnSync').disabled = true;
 
         try {
-            const [resMaster, resTaklimda] = await Promise.all([
-                fetchJsonSafe(URL_MASTER),
+            const urlMasterSecure = `${URL_MASTER}?secure=true&token=${encodeURIComponent(SECRET_KEY)}`;
+            const [resMasterRaw, resTaklimda] = await Promise.all([
+                fetchJsonSafe(urlMasterSecure),
                 fetchJsonSafe(URL_TAKLIMDA + '?action=getAllInitData')
             ]);
+
+            // Jika server mengirim data terenkripsi ({ result: "..." }), dekripsi dulu
+            let resMaster = resMasterRaw;
+            if (resMasterRaw && resMasterRaw.result) {
+                resMaster = decryptPayload(resMasterRaw.result, SECRET_KEY);
+            }
 
             parseMasterData(resMaster);
 
@@ -959,7 +984,7 @@
             document.getElementById('btnExportMTQ').disabled = false;
             document.getElementById('btnExportMQS').disabled = false;
 
-            // Simpan data masif ke IndexedDB browser
+            // Simpan data ke IndexedDB browser
             await saveToIndexedDB(resMaster, rawTaklimdaList);
 
             onFilterChange();
